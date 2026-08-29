@@ -21,6 +21,11 @@ export default function Home() {
   const [selectedTournament, setSelectedTournament] = useState<string>('');
   const [selectedScrimTournament, setSelectedScrimTournament] = useState<string>('');
 
+  // --- ADMIN SECURITY STATES ---
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [passInput, setPassInput] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   // --- MODALS & FORMS ---
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [showPlayerForm, setShowPlayerForm] = useState(false);
@@ -130,9 +135,31 @@ export default function Home() {
     setScrimScores(processed);
   }
 
+  // --- ADMIN LOGIN HANDLER ---
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passInput === 'dolbyhome123') { // รหัสผ่านแอดมิน
+      setIsAdmin(true);
+      setShowLoginModal(false);
+      setPassInput('');
+      alert('เข้าสู่ระบบแอดมินสำเร็จ!');
+    } else {
+      alert('รหัสผ่านไม่ถูกต้อง!');
+    }
+  };
+
+  const requireAdmin = () => {
+    if (!isAdmin) {
+      setShowLoginModal(true);
+      return false;
+    }
+    return true;
+  };
+
   // --- HANDLERS: TEAMS ---
   async function handleAddTeam(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!teamName.trim() || !teamTag.trim()) return;
     await supabase.from('teams').insert([{ name: teamName.trim(), tag: teamTag.trim().toUpperCase() }]);
     setTeamName(''); setTeamTag(''); setShowTeamForm(false);
@@ -140,6 +167,7 @@ export default function Home() {
   }
 
   async function handleDeleteTeam(teamId: string, teamName: string) {
+    if (!requireAdmin()) return;
     if (!confirm(`ต้องการลบ Team "${teamName}" ใช่หรือไม่?`)) return;
     await supabase.from('teams').delete().eq('id', teamId);
     if (selectedTeam?.id === teamId) setSelectedTeam(null);
@@ -149,6 +177,7 @@ export default function Home() {
   // --- HANDLERS: PLAYERS ---
   async function handleAddPlayer(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!ign.trim()) return;
     await supabase.from('players').insert([{ 
       ign: ign.trim(), 
@@ -164,6 +193,7 @@ export default function Home() {
   }
 
   async function handleDeletePlayer(playerId: string, playerIgn: string) {
+    if (!requireAdmin()) return;
     if (!confirm(`ต้องการลบ Player "${playerIgn}" ออกจากระบบถาวรใช่หรือไม่?`)) return;
     await supabase.from('players').delete().eq('id', playerId);
     if (selectedPlayer?.id === playerId) setSelectedPlayer(null);
@@ -172,6 +202,7 @@ export default function Home() {
 
   async function handleUpdatePlayerStats(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!addPlayerKillId) return alert('กรุณาเลือก Player');
     
     const targetPlayer = players.find(p => String(p.id) === String(addPlayerKillId));
@@ -198,6 +229,7 @@ export default function Home() {
   }
 
   async function handleResetPlayerStats(playerId: string, playerIgn: string) {
+    if (!requireAdmin()) return;
     if (!confirm(`ต้องการล้างคะแนนสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
 
     const { error } = await supabase.from('players').update({ 
@@ -217,6 +249,7 @@ export default function Home() {
   }
 
   async function handleCreatePlayerForTeam(teamId: string) {
+    if (!requireAdmin()) return;
     if (!newTeamPlayerIgn.trim()) return alert('กรุณากรอกชื่อ IGN');
     await supabase.from('players').insert([{
       ign: newTeamPlayerIgn.trim(),
@@ -232,6 +265,7 @@ export default function Home() {
   }
 
   async function handleRemovePlayerFromTeam(playerId: string) {
+    if (!requireAdmin()) return;
     await supabase.from('players').update({ team_id: null, status: 'LFT' }).eq('id', playerId);
     fetchAllData();
   }
@@ -239,6 +273,7 @@ export default function Home() {
   // --- HANDLERS: MATCHES ---
   async function handleAddTournament(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!tourneyName.trim()) return;
     const { data } = await supabase.from('tournaments').insert([{ name: tourneyName.trim() }]).select();
     setTourneyName(''); setShowTourneyForm(false);
@@ -247,6 +282,7 @@ export default function Home() {
   }
 
   async function handleDeleteTournament(tourneyId: string) {
+    if (!requireAdmin()) return;
     const targetTourney = tournaments.find(tr => String(tr.id) === String(tourneyId));
     if (!confirm(`ต้องการลบทัวร์นาเมนต์ "${targetTourney?.name || ''}" ใช่หรือไม่? (คะแนนในทัวร์นี้จะถูกลบทั้งหมด)`)) return;
 
@@ -265,6 +301,7 @@ export default function Home() {
 
   async function handleAddScrim(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!scrimName.trim()) return;
     const { data } = await supabase.from('scrim_tournaments').insert([{ name: scrimName.trim(), scrim_date: scrimDate }]).select();
     setScrimName(''); setShowScrimForm(false);
@@ -273,6 +310,7 @@ export default function Home() {
   }
 
   async function handleDeleteScrim(scrimId: string) {
+    if (!requireAdmin()) return;
     const targetScrim = scrimTournaments.find(st => String(st.id) === String(scrimId));
     if (!confirm(`ต้องการลบห้องซ้อม "${targetScrim?.name || ''}" ใช่หรือไม่? (คะแนนในห้องนี้จะถูกลบทั้งหมด)`)) return;
 
@@ -291,6 +329,7 @@ export default function Home() {
 
   async function handleAddScore(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!selectedTournament || !selectedTeamId) return;
     await supabase.from('tournament_scores').insert([{
       tournament_id: selectedTournament,
@@ -305,6 +344,7 @@ export default function Home() {
 
   async function handleAddScrimScore(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAdmin()) return;
     if (!selectedScrimTournament || !selectedScrimTeamId) return;
     await supabase.from('scrim_scores').insert([{
       scrim_tournament_id: selectedScrimTournament,
@@ -319,7 +359,6 @@ export default function Home() {
 
   const rankedPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
 
-  // คำนวณคะแนนและจัดอันดับแยกตามหมวดหมู่ (ซ้อม / ทัวร์)
   const validScrimIds = scrimTournaments.map(st => st.id);
   const validTourneyIds = tournaments.map(tr => tr.id);
 
@@ -345,30 +384,82 @@ export default function Home() {
     <div className="min-h-screen bg-black text-slate-100 font-sans p-4 max-w-md mx-auto border-x border-zinc-900 shadow-2xl relative">
       {/* Header */}
       <header className="py-3 border-b border-zinc-800 mb-4 flex justify-between items-center">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
-          <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
+        <div>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
+            <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
+          </div>
+          {/* ป้ายแอดมินย้ายมาอยู่ข้างล่างคำว่า iSOTOPE ESPORTS และย่อส่วนให้เล็กลง */}
+          <div className="mt-1">
+            {isAdmin ? (
+              <span className="inline-block bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[9px] px-2 py-0.5 rounded font-bold">
+                🔓 แอดมิน
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 text-[9px] px-2 py-0.5 rounded font-bold transition"
+              >
+                🔐 เข้าสู่ระบบแอดมิน
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex gap-1">
           <button onClick={() => setActiveTab('teams')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>🛡️ Team</button>
           <button onClick={() => setActiveTab('players')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'players' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>🎯 Player</button>
-          <button onClick={() => setActiveTab('matches')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>📊 Scrim/Tour</button>
+          <button onClick={() => setActiveTab('matches')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>📊 Scrim</button>
         </div>
       </header>
 
-      {/* ================= TAB 1: TEAMS (แบ่ง 2 ช่อง ซ้อม / ทัวร์) ================= */}
+      {/* Admin Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl w-full max-w-xs space-y-4 shadow-2xl">
+            <h2 className="text-sm font-bold text-sky-400">ยืนยันตัวตนผู้ดูแลระบบ</h2>
+            <p className="text-[11px] text-zinc-400">กรอกรหัสผ่านเพื่อสิทธิ์ในการเพิ่มหรือลบข้อมูล</p>
+            <form onSubmit={handleAdminLogin} className="space-y-3">
+              <input
+                type="password"
+                placeholder="รหัสผ่าน (เช่น 1234)"
+                value={passInput}
+                onChange={(e) => setPassInput(e.target.value)}
+                className="w-full bg-black border border-zinc-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2 rounded-xl text-xs transition"
+                >
+                  ยืนยัน
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginModal(false)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 1: TEAMS ================= */}
       {activeTab === 'teams' && (
         <main className="space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-xs font-bold text-zinc-300">🏆 ตารางจัดอันดับ Team ({teams.length}/5 ทีม)</h2>
-            {teams.length < 5 && (
+            {isAdmin && teams.length < 5 && (
               <button onClick={() => setShowTeamForm(!showTeamForm)} className="text-xs bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
                 {showTeamForm ? 'ปิด' : '+ เพิ่ม Team'}
               </button>
             )}
           </div>
 
-          {showTeamForm && (
+          {isAdmin && showTeamForm && (
             <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
               <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
@@ -376,7 +467,6 @@ export default function Home() {
             </form>
           )}
 
-          {/* ปุ่มสลับมุมมอง คะแนนซ้อม / คะแนนทัวร์ */}
           <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
             <button onClick={() => setTeamSubTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 คะแนนซ้อม</button>
             <button onClick={() => setTeamSubTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 คะแนนทัวร์</button>
@@ -416,7 +506,9 @@ export default function Home() {
                           <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มซ้อมรวม</span>
                           <span className="text-base font-black text-sky-400">{t.totalScrimPts}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                        {isAdmin && (
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                        )}
                       </div>
                     </div>
                   );
@@ -455,7 +547,9 @@ export default function Home() {
                           <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มทัวร์รวม</span>
                           <span className="text-base font-black text-sky-400">{t.totalTourneyPts}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                        {isAdmin && (
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                        )}
                       </div>
                     </div>
                   );
@@ -471,12 +565,14 @@ export default function Home() {
         <main className="space-y-4 text-xs">
           <div className="flex justify-between items-center">
             <h2 className="text-xs font-bold text-zinc-300">🎯 Player และสถิตินักแข่ง</h2>
-            <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
-              {showPlayerForm ? 'ปิด' : '+ เพิ่ม Player'}
-            </button>
+            {isAdmin && (
+              <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
+                {showPlayerForm ? 'ปิด' : '+ เพิ่ม Player'}
+              </button>
+            )}
           </div>
 
-          {showPlayerForm && (
+          {isAdmin && showPlayerForm && (
             <form onSubmit={handleAddPlayer} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
               <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <div className="grid grid-cols-2 gap-2">
@@ -492,19 +588,21 @@ export default function Home() {
             </form>
           )}
 
-          <form onSubmit={handleUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
-            <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล (Kill / Assists / Damage)</p>
-            <select value={addPlayerKillId} onChange={e => setAddPlayerKillId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-              <option value="">-- เลือก Player ที่จะอัปเดตสถิติ --</option>
-              {players.map(p => <option key={p.id} value={p.id}>{p.ign} (K:{p.total_kills || 0} / A:{p.Assists || 0} / Dmg:{p.Damage || 0})</option>)}
-            </select>
-            <div className="grid grid-cols-3 gap-1.5">
-              <input type="number" placeholder="+ Kills" value={addedKillsVal} onChange={e => setAddedKillsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-              <input type="number" placeholder="+ Assists" value={addedAssistsVal} onChange={e => setAddedAssistsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-              <input type="number" placeholder="+ Damage" value={addedDamageVal} onChange={e => setAddedDamageVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-            </div>
-            <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ</button>
-          </form>
+          {isAdmin && (
+            <form onSubmit={handleUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
+              <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล (Kill / Assists / Damage)</p>
+              <select value={addPlayerKillId} onChange={e => setAddPlayerKillId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
+                <option value="">-- เลือก Player ที่จะอัปเดตสถิติ --</option>
+                {players.map(p => <option key={p.id} value={p.id}>{p.ign} (K:{p.total_kills || 0} / A:{p.Assists || 0} / Dmg:{p.Damage || 0})</option>)}
+              </select>
+              <div className="grid grid-cols-3 gap-1.5">
+                <input type="number" placeholder="+ Kills" value={addedKillsVal} onChange={e => setAddedKillsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                <input type="number" placeholder="+ Assists" value={addedAssistsVal} onChange={e => setAddedAssistsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                <input type="number" placeholder="+ Damage" value={addedDamageVal} onChange={e => setAddedDamageVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+              </div>
+              <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ</button>
+            </form>
+          )}
 
           <div className="space-y-2.5">
             {rankedPlayers.length === 0 ? (
@@ -544,7 +642,9 @@ export default function Home() {
                           <span className="text-zinc-400">Dmg: <strong className="text-sky-200">{p.Damage || 0}</strong></span>
                         </div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
+                      {isAdmin && (
+                        <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
+                      )}
                     </div>
                   </div>
                 );
@@ -568,13 +668,15 @@ export default function Home() {
                 <select value={selectedScrimTournament} onChange={e => setSelectedScrimTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
                   {scrimTournaments.length === 0 ? <option value="">-- ยังไม่มีห้องซ้อม --</option> : scrimTournaments.map(st => <option key={st.id} value={st.id}>🏠 {st.name} ({st.scrim_date})</option>)}
                 </select>
-                {selectedScrimTournament && (
+                {isAdmin && selectedScrimTournament && (
                   <button onClick={() => handleDeleteScrim(selectedScrimTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบห้องซ้อมนี้">🗑️ ลบ</button>
                 )}
-                <button onClick={() => setShowScrimForm(!showScrimForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+                {isAdmin && (
+                  <button onClick={() => setShowScrimForm(!showScrimForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+                )}
               </div>
 
-              {showScrimForm && (
+              {isAdmin && showScrimForm && (
                 <form onSubmit={handleAddScrim} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
                   <input type="text" placeholder="ชื่อห้องซ้อม" value={scrimName} onChange={e => setScrimName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
                   <input type="date" value={scrimDate} onChange={e => setScrimDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
@@ -582,7 +684,7 @@ export default function Home() {
                 </form>
               )}
 
-              {selectedScrimTournament && (
+              {isAdmin && selectedScrimTournament && (
                 <form onSubmit={handleAddScrimScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
                   <p className="font-bold text-zinc-300">➕ กรอกแต้มห้องซ้อม Team</p>
                   <select value={selectedScrimTeamId} onChange={e => setSelectedScrimTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
@@ -628,20 +730,22 @@ export default function Home() {
                 <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
                   {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name}</option>)}
                 </select>
-                {selectedTournament && (
+                {isAdmin && selectedTournament && (
                   <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
                 )}
-                <button onClick={() => setShowTourneyForm(!showTourneyForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+                {isAdmin && (
+                  <button onClick={() => setShowTourneyForm(!showTourneyForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+                )}
               </div>
 
-              {showTourneyForm && (
+              {isAdmin && showTourneyForm && (
                 <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
                   <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
                   <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
                 </form>
               )}
 
-              {selectedTournament && (
+              {isAdmin && selectedTournament && (
                 <form onSubmit={handleAddScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
                   <p className="font-bold text-zinc-300">➕ กรอกแต้มทัวร์นาเมนต์ Team</p>
                   <select value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
@@ -694,14 +798,16 @@ export default function Home() {
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
 
-            <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
-              <label className="text-[10px] text-sky-400 font-bold uppercase block">✨ สร้าง Player ใหม่เข้า Team นี้</label>
-              <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
-              <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-2 border border-zinc-800">
-                <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
-              </select>
-              <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ เพิ่ม Player ใหม่</button>
-            </div>
+            {isAdmin && (
+              <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
+                <label className="text-[10px] text-sky-400 font-bold uppercase block">✨ สร้าง Player ใหม่เข้า Team นี้</label>
+                <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
+                <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-2 border border-zinc-800">
+                  <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                </select>
+                <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ เพิ่ม Player ใหม่</button>
+              </div>
+            )}
 
             <div className="space-y-2">
               <p className="text-zinc-300 font-bold">👥 Player ใน Team ({players.filter(p => String(p.team_id) === String(selectedTeam.id)).length}):</p>
@@ -715,10 +821,12 @@ export default function Home() {
                         <span className="text-white font-bold text-sm">{p.ign}</span>
                         <span className="text-[10px] text-sky-400 ml-2 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
                       </div>
-                      <div className="flex gap-1.5">
-                        <button onClick={() => handleResetPlayerStats(p.id, p.ign)} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">ล้างแต้ม</button>
-                        <button onClick={() => handleRemovePlayerFromTeam(p.id)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20">ปลดออก</button>
-                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-1.5">
+                          <button onClick={() => handleResetPlayerStats(p.id, p.ign)} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">ล้างแต้ม</button>
+                          <button onClick={() => handleRemovePlayerFromTeam(p.id)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20">ปลดออก</button>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-1 pt-1 text-[11px] bg-zinc-900 p-1.5 rounded text-center">
                       <div><span className="text-zinc-400 block text-[9px]">KILLS</span><strong className="text-sky-400">{p.total_kills || 0}</strong></div>
@@ -900,7 +1008,9 @@ export default function Home() {
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างสถิติ</button>
+              {isAdmin && (
+                <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างสถิติ</button>
+              )}
               <button onClick={() => setSelectedPlayer(null)} className="flex-1 bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
             </div>
           </div>
