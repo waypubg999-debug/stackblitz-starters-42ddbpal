@@ -43,6 +43,7 @@ export default function Home() {
   const [ign, setIgn] = useState('');
   const [role, setRole] = useState('ATK');
   const [playerTeamId, setPlayerTeamId] = useState('');
+  const [playerAvatarUrl, setPlayerAvatarUrl] = useState('');
 
   const [tourneyName, setTourneyName] = useState('');
   const [scrimName, setScrimName] = useState('');
@@ -61,6 +62,7 @@ export default function Home() {
 
   const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
   const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK');
+  const [newTeamPlayerAvatar, setNewTeamPlayerAvatar] = useState('');
 
   const [addPlayerKillId, setAddPlayerKillId] = useState('');
   const [targetStatType, setTargetStatType] = useState<'scrims' | 'tournaments'>('scrims');
@@ -186,10 +188,11 @@ export default function Home() {
       role, 
       status: playerTeamId ? 'CONTRACTED' : 'LFT',
       team_id: playerTeamId ? String(playerTeamId) : null,
+      avatar_url: playerAvatarUrl.trim() || null,
       total_kills: 0, Assists: 0, Damage: 0,
       tourney_kills: 0, tourney_assists: 0, tourney_damage: 0
     }]);
-    setIgn(''); setPlayerTeamId(''); setShowPlayerForm(false);
+    setIgn(''); setPlayerTeamId(''); setPlayerAvatarUrl(''); setShowPlayerForm(false);
     fetchAllData();
   }
 
@@ -265,12 +268,14 @@ export default function Home() {
     await supabase.from('players').insert([{
       ign: newTeamPlayerIgn.trim(),
       role: newTeamPlayerRole,
+      avatar_url: newTeamPlayerAvatar.trim() || null,
       status: 'CONTRACTED',
       team_id: String(teamId),
       total_kills: 0, Assists: 0, Damage: 0,
       tourney_kills: 0, tourney_assists: 0, tourney_damage: 0
     }]);
     setNewTeamPlayerIgn('');
+    setNewTeamPlayerAvatar('');
     await fetchAllData();
   }
 
@@ -503,9 +508,9 @@ export default function Home() {
                           isTop3 ? 'bg-yellow-500 text-black' : 
                           'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-3">
                           {t.logo_url && (
-                            <img src={t.logo_url} alt={t.name} className="w-8 h-8 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img src={t.logo_url} alt={t.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -549,9 +554,9 @@ export default function Home() {
                           isTop3 ? 'bg-yellow-500 text-black' : 
                           'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-3">
                           {t.logo_url && (
-                            <img src={t.logo_url} alt={t.name} className="w-8 h-8 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img src={t.logo_url} alt={t.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -595,6 +600,7 @@ export default function Home() {
           {isAdmin && showPlayerForm && (
             <form onSubmit={handleAddPlayer} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
               <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL ถ้ามี)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <div className="grid grid-cols-2 gap-2">
                 <select value={role} onChange={e => setRole(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800">
                   <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
@@ -654,12 +660,17 @@ export default function Home() {
                         <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
                           isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-sm text-white">{p.ign}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                        <div className="flex items-center gap-3">
+                          {p.avatar_url && (
+                            <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-sm text-white">{p.ign}</span>
+                              <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -696,12 +707,17 @@ export default function Home() {
                         <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
                           isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-sm text-white">{p.ign}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                        <div className="flex items-center gap-3">
+                          {p.avatar_url && (
+                            <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-sm text-white">{p.ign}</span>
+                              <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -862,9 +878,9 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 {selectedTeam.logo_url && (
-                  <img src={selectedTeam.logo_url} alt={selectedTeam.name} className="w-10 h-10 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                  <img src={selectedTeam.logo_url} alt={selectedTeam.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
                 )}
                 <div>
                   <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
@@ -878,6 +894,7 @@ export default function Home() {
               <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
                 <label className="text-[10px] text-sky-400 font-bold uppercase block">✨ สร้าง Player ใหม่เข้า Team นี้</label>
                 <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
+                <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL)" value={newTeamPlayerAvatar} onChange={e => setNewTeamPlayerAvatar(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
                 <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-2 border border-zinc-800">
                   <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
                 </select>
@@ -893,9 +910,14 @@ export default function Home() {
                 players.filter(p => String(p.team_id) === String(selectedTeam.id)).map(p => (
                   <div key={p.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1">
                     <div className="flex justify-between items-center">
-                      <div>
-                        <span className="text-white font-bold text-sm">{p.ign}</span>
-                        <span className="text-[10px] text-sky-400 ml-2 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
+                      <div className="flex items-center gap-2.5">
+                        {p.avatar_url && (
+                          <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                        )}
+                        <div>
+                          <span className="text-white font-bold text-sm">{p.ign}</span>
+                          <span className="text-[10px] text-sky-400 ml-2 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
+                        </div>
                       </div>
                       {isAdmin && (
                         <div className="flex gap-1.5">
@@ -1056,7 +1078,10 @@ export default function Home() {
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xs rounded-xl p-4 space-y-3">
-            <div className="text-center border-b border-zinc-800 pb-3">
+            <div className="text-center border-b border-zinc-800 pb-3 flex flex-col items-center">
+              {selectedPlayer.avatar_url && (
+                <img src={selectedPlayer.avatar_url} alt={selectedPlayer.ign} className="w-14 h-14 object-cover rounded-xl bg-zinc-950 p-0.5 border border-zinc-800 mb-2" />
+              )}
               <h3 className="font-black text-white text-base">{selectedPlayer.ign}</h3>
               <p className="text-[11px] text-sky-400 mt-0.5">Role: {selectedPlayer.role}</p>
             </div>
