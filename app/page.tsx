@@ -60,6 +60,9 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
 
+  // --- IMAGE LIGHTBOX POPUP STATE ---
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
   const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
   const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK');
   const [newTeamPlayerAvatar, setNewTeamPlayerAvatar] = useState('');
@@ -510,7 +513,13 @@ export default function Home() {
                         }`}>{idx + 1}</span>
                         <div className="flex items-center gap-3">
                           {t.logo_url && (
-                            <img src={t.logo_url} alt={t.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img 
+                              src={t.logo_url} 
+                              alt={t.name} 
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `โลโก้ทีม: [${t.tag}] ${t.name}` }); }}
+                              className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                              title="คลิกเพื่อดูรูปขนาดใหญ่"
+                            />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -556,7 +565,13 @@ export default function Home() {
                         }`}>{idx + 1}</span>
                         <div className="flex items-center gap-3">
                           {t.logo_url && (
-                            <img src={t.logo_url} alt={t.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img 
+                              src={t.logo_url} 
+                              alt={t.name} 
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `โลโก้ทีม: [${t.tag}] ${t.name}` }); }}
+                              className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                              title="คลิกเพื่อดูรูปขนาดใหญ่"
+                            />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -662,7 +677,13 @@ export default function Home() {
                         }`}>{idx + 1}</span>
                         <div className="flex items-center gap-3">
                           {p.avatar_url && (
-                            <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img 
+                              src={p.avatar_url} 
+                              alt={p.ign} 
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
+                              className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                              title="คลิกเพื่อดูรูปขนาดใหญ่"
+                            />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -709,7 +730,13 @@ export default function Home() {
                         }`}>{idx + 1}</span>
                         <div className="flex items-center gap-3">
                           {p.avatar_url && (
-                            <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                            <img 
+                              src={p.avatar_url} 
+                              alt={p.ign} 
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
+                              className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                              title="คลิกเพื่อดูรูปขนาดใหญ่"
+                            />
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -880,7 +907,13 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div className="flex items-center gap-3">
                 {selectedTeam.logo_url && (
-                  <img src={selectedTeam.logo_url} alt={selectedTeam.name} className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                  <img 
+                    src={selectedTeam.logo_url} 
+                    alt={selectedTeam.name} 
+                    onClick={() => setPreviewImage({ url: selectedTeam.logo_url, title: `โลโก้ทีม: [${selectedTeam.tag}] ${selectedTeam.name}` })}
+                    className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                    title="คลิกเพื่อดูรูปขนาดใหญ่"
+                  />
                 )}
                 <div>
                   <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
@@ -912,7 +945,13 @@ export default function Home() {
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2.5">
                         {p.avatar_url && (
-                          <img src={p.avatar_url} alt={p.ign} className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                          <img 
+                            src={p.avatar_url} 
+                            alt={p.ign} 
+                            onClick={() => setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` })}
+                            className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
+                            title="คลิกเพื่อดูรูปขนาดใหญ่"
+                          />
                         )}
                         <div>
                           <span className="text-white font-bold text-sm">{p.ign}</span>
@@ -1080,7 +1119,13 @@ export default function Home() {
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xs rounded-xl p-4 space-y-3">
             <div className="text-center border-b border-zinc-800 pb-3 flex flex-col items-center">
               {selectedPlayer.avatar_url && (
-                <img src={selectedPlayer.avatar_url} alt={selectedPlayer.ign} className="w-14 h-14 object-cover rounded-xl bg-zinc-950 p-0.5 border border-zinc-800 mb-2" />
+                <img 
+                  src={selectedPlayer.avatar_url} 
+                  alt={selectedPlayer.ign} 
+                  onClick={() => setPreviewImage({ url: selectedPlayer.avatar_url, title: `รูปผู้เล่น: ${selectedPlayer.ign}` })}
+                  className="w-16 h-16 object-cover rounded-xl bg-zinc-950 p-0.5 border border-zinc-800 mb-2 hover:scale-105 hover:border-sky-400 transition cursor-pointer" 
+                  title="คลิกเพื่อดูรูปขนาดใหญ่"
+                />
               )}
               <h3 className="font-black text-white text-base">{selectedPlayer.ign}</h3>
               <p className="text-[11px] text-sky-400 mt-0.5">Role: {selectedPlayer.role}</p>
@@ -1112,6 +1157,32 @@ export default function Home() {
               )}
               <button onClick={() => setSelectedPlayer(null)} className="flex-1 bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IMAGE LIGHTBOX POPUP */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="relative max-w-lg w-full flex flex-col items-center space-y-3">
+            <div className="w-full flex justify-between items-center px-1">
+              <span className="text-sky-400 font-bold text-xs">{previewImage.title}</span>
+              <button 
+                onClick={() => setPreviewImage(null)} 
+                className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center transition"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 p-2 rounded-2xl overflow-hidden shadow-2xl max-h-[80vh] flex items-center justify-center w-full">
+              <img src={previewImage.url} alt="Preview" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+            </div>
+            <button 
+              onClick={() => setPreviewImage(null)} 
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs font-bold transition"
+            >
+              ปิดหน้าต่าง
+            </button>
           </div>
         </div>
       )}
