@@ -1,0 +1,911 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'matches'>('teams');
+  const [teamSubTab, setTeamSubTab] = useState<'scrims' | 'tournaments'>('scrims');
+  const [matchSubTab, setMatchSubTab] = useState<'scrims' | 'tournaments'>('scrims');
+
+  // --- CORE STATES ---
+  const [teams, setTeams] = useState<any[]>([]);
+  const [players, setPlayers] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [scrimTournaments, setScrimTournaments] = useState<any[]>([]);
+  
+  const [scores, setScores] = useState<any[]>([]);
+  const [allScores, setAllScores] = useState<any[]>([]);
+  const [scrimScores, setScrimScores] = useState<any[]>([]);
+  const [allScrimScores, setAllScrimScores] = useState<any[]>([]);
+
+  const [selectedTournament, setSelectedTournament] = useState<string>('');
+  const [selectedScrimTournament, setSelectedScrimTournament] = useState<string>('');
+
+  // --- MODALS & FORMS ---
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [showPlayerForm, setShowPlayerForm] = useState(false);
+  const [showTourneyForm, setShowTourneyForm] = useState(false);
+  const [showScrimForm, setShowScrimForm] = useState(false);
+
+  // ป็อปอัพดูรายละเอียดห้องซ้อม / ทัวร์นาเมนต์ แยกตามรายการ
+  const [selectedScrimDetail, setSelectedScrimDetail] = useState<any | null>(null);
+  const [selectedTourneyDetail, setSelectedTourneyDetail] = useState<any | null>(null);
+
+  const [teamName, setTeamName] = useState('');
+  const [teamTag, setTeamTag] = useState('');
+  const [ign, setIgn] = useState('');
+  const [role, setRole] = useState('ATK');
+  const [playerTeamId, setPlayerTeamId] = useState('');
+
+  const [tourneyName, setTourneyName] = useState('');
+  const [scrimName, setScrimName] = useState('');
+  const [scrimDate, setScrimDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [killPts, setKillPts] = useState('');
+  const [placePts, setPlacePts] = useState('');
+
+  const [selectedScrimTeamId, setSelectedScrimTeamId] = useState('');
+  const [scrimKillPts, setScrimKillPts] = useState('');
+  const [scrimPlacePts, setScrimPlacePts] = useState('');
+
+  const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
+
+  // สต็อกเพิ่มผู้เล่นในหน้า Modal Team
+  const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
+  const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK');
+
+  // สต็อกสำหรับอัปเดตสถิติผู้เล่น (Kill, Assists, Damage)
+  const [addPlayerKillId, setAddPlayerKillId] = useState('');
+  const [addedKillsVal, setAddedKillsVal] = useState('');
+  const [addedAssistsVal, setAddedAssistsVal] = useState('');
+  const [addedDamageVal, setAddedDamageVal] = useState('');
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTournament) fetchScores(selectedTournament);
+  }, [selectedTournament]);
+
+  useEffect(() => {
+    if (selectedScrimTournament) fetchScrimScores(selectedScrimTournament);
+  }, [selectedScrimTournament]);
+
+  async function fetchAllData() {
+    try {
+      const { data: tData } = await supabase.from('teams').select('*').order('name', { ascending: true });
+      const { data: pData } = await supabase.from('players').select('*').order('total_kills', { ascending: false });
+      const { data: tourData } = await supabase.from('tournaments').select('*').order('created_at', { ascending: false });
+      const { data: scoreData } = await supabase.from('tournament_scores').select('*');
+      const { data: scrimData } = await supabase.from('scrim_tournaments').select('*').order('created_at', { ascending: false });
+      const { data: scrimScoreData } = await supabase.from('scrim_scores').select('*');
+
+      setTeams(tData || []);
+      setPlayers(pData || []);
+      setTournaments(tourData || []);
+      setAllScores(scoreData || []);
+      setScrimTournaments(scrimData || []);
+      setAllScrimScores(scrimScoreData || []);
+
+      if (tourData && tourData.length > 0) {
+        if (!selectedTournament || !tourData.some((tr: any) => tr.id === selectedTournament)) {
+          setSelectedTournament(tourData[0].id);
+        }
+      } else {
+        setSelectedTournament('');
+      }
+      
+      if (scrimData && scrimData.length > 0) {
+        if (!selectedScrimTournament || !scrimData.some((st: any) => st.id === selectedScrimTournament)) {
+          setSelectedScrimTournament(scrimData[0].id);
+        }
+      } else {
+        setSelectedScrimTournament('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function fetchScores(tId: string) {
+    if (!tId) {
+      setScores([]);
+      return;
+    }
+    const { data } = await supabase.from('tournament_scores').select('*').eq('tournament_id', tId);
+    const processed = (data || []).map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) })).sort((a, b) => b.total - a.total);
+    setScores(processed);
+  }
+
+  async function fetchScrimScores(stId: string) {
+    if (!stId) {
+      setScrimScores([]);
+      return;
+    }
+    const { data } = await supabase.from('scrim_scores').select('*').eq('scrim_tournament_id', stId);
+    const processed = (data || []).map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) })).sort((a, b) => b.total - a.total);
+    setScrimScores(processed);
+  }
+
+  // --- HANDLERS: TEAMS ---
+  async function handleAddTeam(e: React.FormEvent) {
+    e.preventDefault();
+    if (!teamName.trim() || !teamTag.trim()) return;
+    await supabase.from('teams').insert([{ name: teamName.trim(), tag: teamTag.trim().toUpperCase() }]);
+    setTeamName(''); setTeamTag(''); setShowTeamForm(false);
+    fetchAllData();
+  }
+
+  async function handleDeleteTeam(teamId: string, teamName: string) {
+    if (!confirm(`ต้องการลบ Team "${teamName}" ใช่หรือไม่?`)) return;
+    await supabase.from('teams').delete().eq('id', teamId);
+    if (selectedTeam?.id === teamId) setSelectedTeam(null);
+    fetchAllData();
+  }
+
+  // --- HANDLERS: PLAYERS ---
+  async function handleAddPlayer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ign.trim()) return;
+    await supabase.from('players').insert([{ 
+      ign: ign.trim(), 
+      role, 
+      status: playerTeamId ? 'CONTRACTED' : 'LFT',
+      team_id: playerTeamId ? String(playerTeamId) : null,
+      total_kills: 0,
+      Assists: 0,
+      Damage: 0
+    }]);
+    setIgn(''); setPlayerTeamId(''); setShowPlayerForm(false);
+    fetchAllData();
+  }
+
+  async function handleDeletePlayer(playerId: string, playerIgn: string) {
+    if (!confirm(`ต้องการลบ Player "${playerIgn}" ออกจากระบบถาวรใช่หรือไม่?`)) return;
+    await supabase.from('players').delete().eq('id', playerId);
+    if (selectedPlayer?.id === playerId) setSelectedPlayer(null);
+    fetchAllData();
+  }
+
+  async function handleUpdatePlayerStats(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addPlayerKillId) return alert('กรุณาเลือก Player');
+    
+    const targetPlayer = players.find(p => String(p.id) === String(addPlayerKillId));
+    if (!targetPlayer) return;
+
+    const newKills = Number(targetPlayer.total_kills || 0) + parseInt(addedKillsVal || '0');
+    const newAssists = Number(targetPlayer.Assists || 0) + parseInt(addedAssistsVal || '0');
+    const newDamage = Number(targetPlayer.Damage || 0) + parseInt(addedDamageVal || '0');
+
+    const { error } = await supabase.from('players').update({ 
+      total_kills: newKills,
+      Assists: newAssists,
+      Damage: newDamage
+    }).eq('id', targetPlayer.id);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการอัปเดต: ' + error.message);
+      return;
+    }
+
+    setAddPlayerKillId(''); setAddedKillsVal(''); setAddedAssistsVal(''); setAddedDamageVal('');
+    fetchAllData();
+    alert(`อัปเดตสถิติให้ ${targetPlayer.ign} เรียบร้อย!`);
+  }
+
+  async function handleResetPlayerStats(playerId: string, playerIgn: string) {
+    if (!confirm(`ต้องการล้างคะแนนสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
+
+    const { error } = await supabase.from('players').update({ 
+      total_kills: 0,
+      Assists: 0,
+      Damage: 0
+    }).eq('id', playerId);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการล้างคะแนน: ' + error.message);
+      return;
+    }
+
+    setSelectedPlayer(null);
+    fetchAllData();
+    alert(`ล้างคะแนนของ ${playerIgn} เรียบร้อยแล้ว!`);
+  }
+
+  async function handleCreatePlayerForTeam(teamId: string) {
+    if (!newTeamPlayerIgn.trim()) return alert('กรุณากรอกชื่อ IGN');
+    await supabase.from('players').insert([{
+      ign: newTeamPlayerIgn.trim(),
+      role: newTeamPlayerRole,
+      status: 'CONTRACTED',
+      team_id: String(teamId),
+      total_kills: 0,
+      Assists: 0,
+      Damage: 0
+    }]);
+    setNewTeamPlayerIgn('');
+    await fetchAllData();
+  }
+
+  async function handleRemovePlayerFromTeam(playerId: string) {
+    await supabase.from('players').update({ team_id: null, status: 'LFT' }).eq('id', playerId);
+    fetchAllData();
+  }
+
+  // --- HANDLERS: MATCHES ---
+  async function handleAddTournament(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tourneyName.trim()) return;
+    const { data } = await supabase.from('tournaments').insert([{ name: tourneyName.trim() }]).select();
+    setTourneyName(''); setShowTourneyForm(false);
+    fetchAllData();
+    if (data && data[0]) setSelectedTournament(data[0].id);
+  }
+
+  async function handleDeleteTournament(tourneyId: string) {
+    const targetTourney = tournaments.find(tr => String(tr.id) === String(tourneyId));
+    if (!confirm(`ต้องการลบทัวร์นาเมนต์ "${targetTourney?.name || ''}" ใช่หรือไม่? (คะแนนในทัวร์นี้จะถูกลบทั้งหมด)`)) return;
+
+    await supabase.from('tournament_scores').delete().eq('tournament_id', tourneyId);
+    const { error } = await supabase.from('tournaments').delete().eq('id', tourneyId);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการลบทัวร์นาเมนต์: ' + error.message);
+      return;
+    }
+
+    setSelectedTournament('');
+    fetchAllData();
+    alert('ลบทัวร์นาเมนต์เรียบร้อยแล้ว!');
+  }
+
+  async function handleAddScrim(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scrimName.trim()) return;
+    const { data } = await supabase.from('scrim_tournaments').insert([{ name: scrimName.trim(), scrim_date: scrimDate }]).select();
+    setScrimName(''); setShowScrimForm(false);
+    fetchAllData();
+    if (data && data[0]) setSelectedScrimTournament(data[0].id);
+  }
+
+  async function handleDeleteScrim(scrimId: string) {
+    const targetScrim = scrimTournaments.find(st => String(st.id) === String(scrimId));
+    if (!confirm(`ต้องการลบห้องซ้อม "${targetScrim?.name || ''}" ใช่หรือไม่? (คะแนนในห้องนี้จะถูกลบทั้งหมด)`)) return;
+
+    await supabase.from('scrim_scores').delete().eq('scrim_tournament_id', scrimId);
+    const { error } = await supabase.from('scrim_tournaments').delete().eq('id', scrimId);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการลบห้องซ้อม: ' + error.message);
+      return;
+    }
+
+    setSelectedScrimTournament('');
+    fetchAllData();
+    alert('ลบห้องซ้อมเรียบร้อยแล้ว!');
+  }
+
+  async function handleAddScore(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTournament || !selectedTeamId) return;
+    await supabase.from('tournament_scores').insert([{
+      tournament_id: selectedTournament,
+      team_id: selectedTeamId,
+      kill_points: parseInt(killPts || '0'),
+      placement_points: parseInt(placePts || '0')
+    }]);
+    setSelectedTeamId(''); setKillPts(''); setPlacePts('');
+    fetchScores(selectedTournament);
+    fetchAllData();
+  }
+
+  async function handleAddScrimScore(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedScrimTournament || !selectedScrimTeamId) return;
+    await supabase.from('scrim_scores').insert([{
+      scrim_tournament_id: selectedScrimTournament,
+      team_id: selectedScrimTeamId,
+      kill_points: parseInt(scrimKillPts || '0'),
+      placement_points: parseInt(scrimPlacePts || '0')
+    }]);
+    setSelectedScrimTeamId(''); setScrimKillPts(''); setScrimPlacePts('');
+    fetchScrimScores(selectedScrimTournament);
+    fetchAllData();
+  }
+
+  const rankedPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
+
+  // คำนวณคะแนนและจัดอันดับแยกตามหมวดหมู่ (ซ้อม / ทัวร์)
+  const validScrimIds = scrimTournaments.map(st => st.id);
+  const validTourneyIds = tournaments.map(tr => tr.id);
+
+  const teamsWithScores = teams.map(team => {
+    const teamTourneyScores = allScores.filter(s => String(s.team_id) === String(team.id) && validTourneyIds.includes(s.tournament_id));
+    const teamScrimScores = allScrimScores.filter(s => String(s.team_id) === String(team.id) && validScrimIds.includes(s.scrim_tournament_id));
+
+    const totalTourneyPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+    const totalScrimPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+
+    return {
+      ...team,
+      totalTourneyPts,
+      totalScrimPts,
+      roster: players.filter(p => String(p.team_id) === String(team.id))
+    };
+  });
+
+  const rankedScrimTeams = [...teamsWithScores].sort((a, b) => b.totalScrimPts - a.totalScrimPts);
+  const rankedTourneyTeams = [...teamsWithScores].sort((a, b) => b.totalTourneyPts - a.totalTourneyPts);
+
+  return (
+    <div className="min-h-screen bg-black text-slate-100 font-sans p-4 max-w-md mx-auto border-x border-zinc-900 shadow-2xl relative">
+      {/* Header */}
+      <header className="py-3 border-b border-zinc-800 mb-4 flex justify-between items-center">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
+          <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
+        </div>
+        <div className="flex gap-1">
+          <button onClick={() => setActiveTab('teams')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>🛡️ Team</button>
+          <button onClick={() => setActiveTab('players')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'players' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>🎯 Player</button>
+          <button onClick={() => setActiveTab('matches')} className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}>📊 Scrim/Tour</button>
+        </div>
+      </header>
+
+      {/* ================= TAB 1: TEAMS (แบ่ง 2 ช่อง ซ้อม / ทัวร์) ================= */}
+      {activeTab === 'teams' && (
+        <main className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xs font-bold text-zinc-300">🏆 ตารางจัดอันดับ Team ({teams.length}/5 ทีม)</h2>
+            {teams.length < 5 && (
+              <button onClick={() => setShowTeamForm(!showTeamForm)} className="text-xs bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
+                {showTeamForm ? 'ปิด' : '+ เพิ่ม Team'}
+              </button>
+            )}
+          </div>
+
+          {showTeamForm && (
+            <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
+              <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
+              <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Team</button>
+            </form>
+          )}
+
+          {/* ปุ่มสลับมุมมอง คะแนนซ้อม / คะแนนทัวร์ */}
+          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
+            <button onClick={() => setTeamSubTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 คะแนนซ้อม</button>
+            <button onClick={() => setTeamSubTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 คะแนนทัวร์</button>
+          </div>
+
+          <div className="space-y-2.5">
+            {teamSubTab === 'scrims' ? (
+              rankedScrimTeams.length === 0 ? (
+                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Team</div>
+              ) : (
+                rankedScrimTeams.map((t, idx) => {
+                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+                  return (
+                    <div key={t.id} onClick={() => setSelectedTeam(t)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition shadow-sm ${
+                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
+                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
+                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
+                      'bg-zinc-900 border-zinc-800 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                          isTop1 ? 'bg-red-500 text-white' : 
+                          isTop2 ? 'bg-orange-500 text-white' : 
+                          isTop3 ? 'bg-yellow-500 text-black' : 
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>{idx + 1}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
+                            <span className="font-bold text-sm text-white">{t.name}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มซ้อมรวม</span>
+                          <span className="text-base font-black text-sky-400">{t.totalScrimPts}</span>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : (
+              rankedTourneyTeams.length === 0 ? (
+                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Team</div>
+              ) : (
+                rankedTourneyTeams.map((t, idx) => {
+                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+                  return (
+                    <div key={t.id} onClick={() => setSelectedTeam(t)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition shadow-sm ${
+                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
+                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
+                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
+                      'bg-zinc-900 border-zinc-800 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                          isTop1 ? 'bg-red-500 text-white' : 
+                          isTop2 ? 'bg-orange-500 text-white' : 
+                          isTop3 ? 'bg-yellow-500 text-black' : 
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>{idx + 1}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
+                            <span className="font-bold text-sm text-white">{t.name}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มทัวร์รวม</span>
+                          <span className="text-base font-black text-sky-400">{t.totalTourneyPts}</span>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* ================= TAB 2: PLAYERS ================= */}
+      {activeTab === 'players' && (
+        <main className="space-y-4 text-xs">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xs font-bold text-zinc-300">🎯 Player และสถิตินักแข่ง</h2>
+            <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
+              {showPlayerForm ? 'ปิด' : '+ เพิ่ม Player'}
+            </button>
+          </div>
+
+          {showPlayerForm && (
+            <form onSubmit={handleAddPlayer} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
+              <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={role} onChange={e => setRole(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800">
+                  <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                </select>
+                <select value={playerTeamId} onChange={e => setPlayerTeamId(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800">
+                  <option value="">-- Free Agent (LFT) --</option>
+                  {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Player</button>
+            </form>
+          )}
+
+          <form onSubmit={handleUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
+            <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล (Kill / Assists / Damage)</p>
+            <select value={addPlayerKillId} onChange={e => setAddPlayerKillId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
+              <option value="">-- เลือก Player ที่จะอัปเดตสถิติ --</option>
+              {players.map(p => <option key={p.id} value={p.id}>{p.ign} (K:{p.total_kills || 0} / A:{p.Assists || 0} / Dmg:{p.Damage || 0})</option>)}
+            </select>
+            <div className="grid grid-cols-3 gap-1.5">
+              <input type="number" placeholder="+ Kills" value={addedKillsVal} onChange={e => setAddedKillsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="number" placeholder="+ Assists" value={addedAssistsVal} onChange={e => setAddedAssistsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="number" placeholder="+ Damage" value={addedDamageVal} onChange={e => setAddedDamageVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+            </div>
+            <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ</button>
+          </form>
+
+          <div className="space-y-2.5">
+            {rankedPlayers.length === 0 ? (
+              <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Player</div>
+            ) : (
+              rankedPlayers.map((p, idx) => {
+                const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
+                const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+
+                return (
+                  <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition ${
+                    isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
+                    isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
+                    isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
+                    'bg-zinc-900 border-zinc-800 text-zinc-300'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                        isTop1 ? 'bg-red-500 text-white' : 
+                        isTop2 ? 'bg-orange-500 text-white' : 
+                        isTop3 ? 'bg-yellow-500 text-black' : 
+                        'bg-zinc-800 text-zinc-400'
+                      }`}>{idx + 1}</span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-sm text-white">{p.ign}</span>
+                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right space-y-0.5">
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="text-zinc-400">K: <strong className="text-sky-400">{p.total_kills || 0}</strong></span>
+                          <span className="text-zinc-400">A: <strong className="text-sky-300">{p.Assists || 0}</strong></span>
+                          <span className="text-zinc-400">Dmg: <strong className="text-sky-200">{p.Damage || 0}</strong></span>
+                        </div>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* ================= TAB 3: MATCHES ================= */}
+      {activeTab === 'matches' && (
+        <main className="space-y-3 text-xs">
+          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+            <button onClick={() => setMatchSubTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${matchSubTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 ห้องซ้อม</button>
+            <button onClick={() => setMatchSubTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${matchSubTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏆 ทัวร์</button>
+          </div>
+
+          {matchSubTab === 'scrims' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <select value={selectedScrimTournament} onChange={e => setSelectedScrimTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
+                  {scrimTournaments.length === 0 ? <option value="">-- ยังไม่มีห้องซ้อม --</option> : scrimTournaments.map(st => <option key={st.id} value={st.id}>🏠 {st.name} ({st.scrim_date})</option>)}
+                </select>
+                {selectedScrimTournament && (
+                  <button onClick={() => handleDeleteScrim(selectedScrimTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบห้องซ้อมนี้">🗑️ ลบ</button>
+                )}
+                <button onClick={() => setShowScrimForm(!showScrimForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+              </div>
+
+              {showScrimForm && (
+                <form onSubmit={handleAddScrim} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
+                  <input type="text" placeholder="ชื่อห้องซ้อม" value={scrimName} onChange={e => setScrimName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                  <input type="date" value={scrimDate} onChange={e => setScrimDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                  <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างห้องซ้อม</button>
+                </form>
+              )}
+
+              {selectedScrimTournament && (
+                <form onSubmit={handleAddScrimScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
+                  <p className="font-bold text-zinc-300">➕ กรอกแต้มห้องซ้อม Team</p>
+                  <select value={selectedScrimTeamId} onChange={e => setSelectedScrimTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
+                    <option value="">-- เลือก Team --</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="Kill Pts" value={scrimKillPts} onChange={e => setScrimKillPts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                    <input type="number" placeholder="Place Pts" value={scrimPlacePts} onChange={e => setScrimPlacePts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                  </div>
+                  <button type="submit" className="w-full bg-zinc-800 text-sky-400 border border-sky-500/30 font-bold py-1.5 rounded">บันทึกแต้ม Team</button>
+                </form>
+              )}
+
+              <div className="space-y-2 pt-2">
+                <h3 className="font-bold text-zinc-300">📅 ประวัติห้องซ้อม (คลิกเพื่อดูรายละเอียด)</h3>
+                {scrimTournaments.length === 0 ? (
+                  <div className="bg-zinc-900/40 p-4 rounded-xl border border-zinc-800 text-center text-zinc-500">ยังไม่มีประวัติการสร้างห้องซ้อม</div>
+                ) : (
+                  scrimTournaments.map(st => {
+                    const thisScrimScores = allScrimScores.filter(s => String(s.scrim_tournament_id) === String(st.id));
+                    return (
+                      <div key={st.id} onClick={() => setSelectedScrimDetail(st)} className="bg-zinc-900 hover:bg-zinc-850 p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer transition shadow-sm group">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sky-400">🏠 {st.name}</span>
+                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{st.scrim_date}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisScrimScores.length} Team</strong></p>
+                        </div>
+                        <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {matchSubTab === 'tournaments' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
+                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name}</option>)}
+                </select>
+                {selectedTournament && (
+                  <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
+                )}
+                <button onClick={() => setShowTourneyForm(!showTourneyForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
+              </div>
+
+              {showTourneyForm && (
+                <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
+                  <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                  <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
+                </form>
+              )}
+
+              {selectedTournament && (
+                <form onSubmit={handleAddScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
+                  <p className="font-bold text-zinc-300">➕ กรอกแต้มทัวร์นาเมนต์ Team</p>
+                  <select value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
+                    <option value="">-- เลือก Team --</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="Kill Pts" value={killPts} onChange={e => setKillPts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                    <input type="number" placeholder="Place Pts" value={placePts} onChange={e => setPlacePts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
+                  </div>
+                  <button type="submit" className="w-full bg-zinc-800 text-sky-400 border border-sky-500/30 font-bold py-1.5 rounded">บันทึกแต้ม Team</button>
+                </form>
+              )}
+
+              <div className="space-y-2 pt-2">
+                <h3 className="font-bold text-zinc-300">🏆 ประวัติทัวร์นาเมนต์ (คลิกเพื่อดูรายละเอียด)</h3>
+                {tournaments.length === 0 ? (
+                  <div className="bg-zinc-900/40 p-4 rounded-xl border border-zinc-800 text-center text-zinc-500">ยังไม่มีประวัติการสร้างทัวร์นาเมนต์</div>
+                ) : (
+                  tournaments.map(tr => {
+                    const thisTourneyScores = allScores.filter(s => String(s.tournament_id) === String(tr.id));
+                    return (
+                      <div key={tr.id} onClick={() => setSelectedTourneyDetail(tr)} className="bg-zinc-900 hover:bg-zinc-850 p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer transition shadow-sm group">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sky-400">🏆 {tr.name}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisTourneyScores.length} Team</strong></p>
+                        </div>
+                        <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* MODAL: TEAM DETAILS */}
+      {selectedTeam && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+              <div>
+                <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
+                <p className="text-[10px] text-zinc-400">แต้มซ้อมรวม: <strong className="text-sky-400">{selectedTeam.totalScrimPts}</strong> | แต้มทัวร์รวม: <strong className="text-sky-300">{selectedTeam.totalTourneyPts}</strong></p>
+              </div>
+              <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
+            </div>
+
+            <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
+              <label className="text-[10px] text-sky-400 font-bold uppercase block">✨ สร้าง Player ใหม่เข้า Team นี้</label>
+              <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
+              <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-2 border border-zinc-800">
+                <option value="ATK">ATK</option><option value="IGL">IGL</option><option value="Support">Support</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+              </select>
+              <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ เพิ่ม Player ใหม่</button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-zinc-300 font-bold">👥 Player ใน Team ({players.filter(p => String(p.team_id) === String(selectedTeam.id)).length}):</p>
+              {players.filter(p => String(p.team_id) === String(selectedTeam.id)).length === 0 ? (
+                <p className="text-zinc-500 italic text-center py-2">ยังไม่มี Player ใน Team นี้</p>
+              ) : (
+                players.filter(p => String(p.team_id) === String(selectedTeam.id)).map(p => (
+                  <div key={p.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-white font-bold text-sm">{p.ign}</span>
+                        <span className="text-[10px] text-sky-400 ml-2 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => handleResetPlayerStats(p.id, p.ign)} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">ล้างแต้ม</button>
+                        <button onClick={() => handleRemovePlayerFromTeam(p.id)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20">ปลดออก</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1 text-[11px] bg-zinc-900 p-1.5 rounded text-center">
+                      <div><span className="text-zinc-400 block text-[9px]">KILLS</span><strong className="text-sky-400">{p.total_kills || 0}</strong></div>
+                      <div><span className="text-zinc-400 block text-[9px]">ASSISTS</span><strong className="text-sky-300">{p.Assists || 0}</strong></div>
+                      <div><span className="text-zinc-400 block text-[9px]">DAMAGE</span><strong className="text-sky-200">{p.Damage || 0}</strong></div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <p className="text-zinc-300 font-bold">📜 ประวัติคะแนนแยกตามรายการ:</p>
+              
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-sky-400 font-bold">🏠 ห้องซ้อม:</p>
+                {allScrimScores.filter(s => String(s.team_id) === String(selectedTeam.id)).length === 0 ? (
+                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติห้องซ้อม</p>
+                ) : (
+                  allScrimScores.filter(s => String(s.team_id) === String(selectedTeam.id)).map(scrimScore => {
+                    const stInfo = scrimTournaments.find(st => String(st.id) === String(scrimScore.scrim_tournament_id));
+                    if (!stInfo) return null;
+                    const total = (scrimScore.kill_points || 0) + (scrimScore.placement_points || 0);
+                    return (
+                      <div key={scrimScore.id} className="bg-black p-2 rounded flex justify-between items-center text-[11px] border border-zinc-800">
+                        <span className="text-zinc-300">{stInfo.name} ({stInfo.scrim_date})</span>
+                        <span className="font-bold text-sky-400">{total} แต้ม</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] text-sky-300 font-bold">🏆 ทัวร์นาเมนต์:</p>
+                {allScores.filter(s => String(s.team_id) === String(selectedTeam.id)).length === 0 ? (
+                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติทัวร์นาเมนต์</p>
+                ) : (
+                  allScores.filter(s => String(s.team_id) === String(selectedTeam.id)).map(tourneyScore => {
+                    const trInfo = tournaments.find(tr => String(tr.id) === String(tourneyScore.tournament_id));
+                    if (!trInfo) return null;
+                    const total = (tourneyScore.kill_points || 0) + (tourneyScore.placement_points || 0);
+                    return (
+                      <div key={tourneyScore.id} className="bg-black p-2 rounded flex justify-between items-center text-[11px] border border-zinc-800">
+                        <span className="text-zinc-300">{trInfo.name}</span>
+                        <span className="font-bold text-sky-300">{total} แต้ม</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <button onClick={() => setSelectedTeam(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SCRIM DETAIL POPUP */}
+      {selectedScrimDetail && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+              <div>
+                <h3 className="font-bold text-sky-400 text-sm">🏠 {selectedScrimDetail.name}</h3>
+                <p className="text-[10px] text-zinc-400">วันที่ซ้อม: {selectedScrimDetail.scrim_date}</p>
+              </div>
+              <button onClick={() => setSelectedScrimDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-zinc-300 font-bold">📊 ผลคะแนนในห้องซ้อมนี้:</p>
+              {allScrimScores.filter(s => String(s.scrim_tournament_id) === String(selectedScrimDetail.id)).length === 0 ? (
+                <p className="text-zinc-500 italic text-center py-4">ยังไม่มีการบันทึกคะแนนในวันนี้</p>
+              ) : (
+                allScrimScores
+                  .filter(s => String(s.scrim_tournament_id) === String(selectedScrimDetail.id))
+                  .map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) }))
+                  .sort((a, b) => b.total - a.total)
+                  .map((scoreItem, idx) => {
+                    const teamInfo = teams.find(tm => String(tm.id) === String(scoreItem.team_id));
+                    return (
+                      <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
+                            idx === 0 ? 'bg-red-500 text-white' :
+                            idx === 1 ? 'bg-orange-500 text-white' :
+                            idx === 2 ? 'bg-yellow-500 text-black' :
+                            'bg-zinc-800 text-zinc-400'
+                          }`}>{idx + 1}</span>
+                          <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-sky-400 text-sm">{scoreItem.total} แต้ม</span>
+                          <span className="text-[9px] text-zinc-400 block">Kill: {scoreItem.kill_points} | Place: {scoreItem.placement_points}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            <button onClick={() => setSelectedScrimDetail(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TOURNAMENT DETAIL POPUP */}
+      {selectedTourneyDetail && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+              <div>
+                <h3 className="font-bold text-sky-300 text-sm">🏆 {selectedTourneyDetail.name}</h3>
+                <p className="text-[10px] text-zinc-400">ผลการแข่งขันทางการ</p>
+              </div>
+              <button onClick={() => setSelectedTourneyDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-zinc-300 font-bold">📊 ผลคะแนนในทัวร์นี้:</p>
+              {allScores.filter(s => String(s.tournament_id) === String(selectedTourneyDetail.id)).length === 0 ? (
+                <p className="text-zinc-500 italic text-center py-4">ยังไม่มีการบันทึกคะแนนในทัวร์นี้</p>
+              ) : (
+                allScores
+                  .filter(s => String(s.tournament_id) === String(selectedTourneyDetail.id))
+                  .map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) }))
+                  .sort((a, b) => b.total - a.total)
+                  .map((scoreItem, idx) => {
+                    const teamInfo = teams.find(tm => String(tm.id) === String(scoreItem.team_id));
+                    return (
+                      <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
+                            idx === 0 ? 'bg-red-500 text-white' :
+                            idx === 1 ? 'bg-orange-500 text-white' :
+                            idx === 2 ? 'bg-yellow-500 text-black' :
+                            'bg-zinc-800 text-zinc-400'
+                          }`}>{idx + 1}</span>
+                          <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-sky-300 text-sm">{scoreItem.total} แต้ม</span>
+                          <span className="text-[9px] text-zinc-400 block">Kill: {scoreItem.kill_points} | Place: {scoreItem.placement_points}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            <button onClick={() => setSelectedTourneyDetail(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PLAYER FULL PROFILE DETAILS */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xs rounded-xl p-4 space-y-3">
+            <div className="text-center border-b border-zinc-800 pb-3">
+              <h3 className="font-black text-white text-base">{selectedPlayer.ign}</h3>
+              <p className="text-[11px] text-sky-400 mt-0.5">Role: {selectedPlayer.role}</p>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2 text-center py-2 bg-black rounded-xl border border-zinc-800">
+              <div>
+                <span className="text-[10px] text-zinc-400 block">Kills</span>
+                <span className="text-base font-black text-sky-400">{selectedPlayer.total_kills || 0}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-400 block">Assists</span>
+                <span className="text-base font-black text-sky-300">{selectedPlayer.Assists || 0}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-400 block">Damage</span>
+                <span className="text-base font-black text-sky-200">{selectedPlayer.Damage || 0}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างสถิติ</button>
+              <button onClick={() => setSelectedPlayer(null)} className="flex-1 bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
