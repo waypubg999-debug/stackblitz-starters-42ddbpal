@@ -6,6 +6,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'matches'>('teams');
   const [teamSubTab, setTeamSubTab] = useState<'scrims' | 'tournaments'>('scrims');
   const [matchSubTab, setMatchSubTab] = useState<'scrims' | 'tournaments'>('scrims');
+  const [playerStatTab, setPlayerStatTab] = useState<'scrims' | 'tournaments'>('scrims');
 
   // --- CORE STATES ---
   const [teams, setTeams] = useState<any[]>([]);
@@ -32,7 +33,6 @@ export default function Home() {
   const [showTourneyForm, setShowTourneyForm] = useState(false);
   const [showScrimForm, setShowScrimForm] = useState(false);
 
-  // ป็อปอัพดูรายละเอียดห้องซ้อม / ทัวร์นาเมนต์ แยกตามรายการ
   const [selectedScrimDetail, setSelectedScrimDetail] = useState<any | null>(null);
   const [selectedTourneyDetail, setSelectedTourneyDetail] = useState<any | null>(null);
 
@@ -57,12 +57,12 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
 
-  // สต็อกเพิ่มผู้เล่นในหน้า Modal Team
   const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
   const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK');
 
-  // สต็อกสำหรับอัปเดตสถิติผู้เล่น (Kill, Assists, Damage)
+  // สต็อกสำหรับอัปเดตสถิติผู้เล่นแยกตามโหมด (ซ้อม / ทัวร์)
   const [addPlayerKillId, setAddPlayerKillId] = useState('');
+  const [targetStatType, setTargetStatType] = useState<'scrims' | 'tournaments'>('scrims');
   const [addedKillsVal, setAddedKillsVal] = useState('');
   const [addedAssistsVal, setAddedAssistsVal] = useState('');
   const [addedDamageVal, setAddedDamageVal] = useState('');
@@ -135,10 +135,9 @@ export default function Home() {
     setScrimScores(processed);
   }
 
-  // --- ADMIN LOGIN HANDLER ---
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passInput === 'dolbyhome123') { // รหัสผ่านแอดมิน
+    if (passInput === 'coachway123') { // รหัสผ่านแอดมิน
       setIsAdmin(true);
       setShowLoginModal(false);
       setPassInput('');
@@ -156,7 +155,6 @@ export default function Home() {
     return true;
   };
 
-  // --- HANDLERS: TEAMS ---
   async function handleAddTeam(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAdmin()) return;
@@ -174,7 +172,6 @@ export default function Home() {
     fetchAllData();
   }
 
-  // --- HANDLERS: PLAYERS ---
   async function handleAddPlayer(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAdmin()) return;
@@ -184,9 +181,8 @@ export default function Home() {
       role, 
       status: playerTeamId ? 'CONTRACTED' : 'LFT',
       team_id: playerTeamId ? String(playerTeamId) : null,
-      total_kills: 0,
-      Assists: 0,
-      Damage: 0
+      total_kills: 0, Assists: 0, Damage: 0,
+      tourney_kills: 0, tourney_assists: 0, tourney_damage: 0
     }]);
     setIgn(''); setPlayerTeamId(''); setShowPlayerForm(false);
     fetchAllData();
@@ -208,15 +204,26 @@ export default function Home() {
     const targetPlayer = players.find(p => String(p.id) === String(addPlayerKillId));
     if (!targetPlayer) return;
 
-    const newKills = Number(targetPlayer.total_kills || 0) + parseInt(addedKillsVal || '0');
-    const newAssists = Number(targetPlayer.Assists || 0) + parseInt(addedAssistsVal || '0');
-    const newDamage = Number(targetPlayer.Damage || 0) + parseInt(addedDamageVal || '0');
+    const addK = parseInt(addedKillsVal || '0');
+    const addA = parseInt(addedAssistsVal || '0');
+    const addD = parseInt(addedDamageVal || '0');
 
-    const { error } = await supabase.from('players').update({ 
-      total_kills: newKills,
-      Assists: newAssists,
-      Damage: newDamage
-    }).eq('id', targetPlayer.id);
+    let updateData: any = {};
+    if (targetStatType === 'scrims') {
+      updateData = { 
+        total_kills: Number(targetPlayer.total_kills || 0) + addK,
+        Assists: Number(targetPlayer.Assists || 0) + addA,
+        Damage: Number(targetPlayer.Damage || 0) + addD
+      };
+    } else {
+      updateData = { 
+        tourney_kills: Number(targetPlayer.tourney_kills || 0) + addK,
+        tourney_assists: Number(targetPlayer.tourney_assists || 0) + addA,
+        tourney_damage: Number(targetPlayer.tourney_damage || 0) + addD
+      };
+    }
+
+    const { error } = await supabase.from('players').update(updateData).eq('id', targetPlayer.id);
 
     if (error) {
       alert('เกิดข้อผิดพลาดในการอัปเดต: ' + error.message);
@@ -225,7 +232,7 @@ export default function Home() {
 
     setAddPlayerKillId(''); setAddedKillsVal(''); setAddedAssistsVal(''); setAddedDamageVal('');
     fetchAllData();
-    alert(`อัปเดตสถิติให้ ${targetPlayer.ign} เรียบร้อย!`);
+    alert(`อัปเดตสถิติ (${targetStatType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'}) ให้ ${targetPlayer.ign} เรียบร้อย!`);
   }
 
   async function handleResetPlayerStats(playerId: string, playerIgn: string) {
@@ -233,9 +240,8 @@ export default function Home() {
     if (!confirm(`ต้องการล้างคะแนนสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
 
     const { error } = await supabase.from('players').update({ 
-      total_kills: 0,
-      Assists: 0,
-      Damage: 0
+      total_kills: 0, Assists: 0, Damage: 0,
+      tourney_kills: 0, tourney_assists: 0, tourney_damage: 0
     }).eq('id', playerId);
 
     if (error) {
@@ -256,9 +262,8 @@ export default function Home() {
       role: newTeamPlayerRole,
       status: 'CONTRACTED',
       team_id: String(teamId),
-      total_kills: 0,
-      Assists: 0,
-      Damage: 0
+      total_kills: 0, Assists: 0, Damage: 0,
+      tourney_kills: 0, tourney_assists: 0, tourney_damage: 0
     }]);
     setNewTeamPlayerIgn('');
     await fetchAllData();
@@ -270,7 +275,6 @@ export default function Home() {
     fetchAllData();
   }
 
-  // --- HANDLERS: MATCHES ---
   async function handleAddTournament(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAdmin()) return;
@@ -357,7 +361,9 @@ export default function Home() {
     fetchAllData();
   }
 
-  const rankedPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
+  // จัดอันดับผู้เล่นตามโหมด (ซ้อม / ทัวร์)
+  const rankedScrimPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
+  const rankedTourneyPlayers = [...players].sort((a, b) => (b.tourney_kills || 0) - (a.tourney_kills || 0));
 
   const validScrimIds = scrimTournaments.map(st => st.id);
   const validTourneyIds = tournaments.map(tr => tr.id);
@@ -389,7 +395,6 @@ export default function Home() {
             <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
             <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
           </div>
-          {/* ป้ายแอดมินย้ายมาอยู่ข้างล่างคำว่า iSOTOPE ESPORTS และย่อส่วนให้เล็กลง */}
           <div className="mt-1">
             {isAdmin ? (
               <span className="inline-block bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[9px] px-2 py-0.5 rounded font-bold">
@@ -421,7 +426,7 @@ export default function Home() {
             <form onSubmit={handleAdminLogin} className="space-y-3">
               <input
                 type="password"
-                placeholder="รหัสผ่าน (เช่น 1234)"
+                placeholder="รหัสผ่านแอดมิน"
                 value={passInput}
                 onChange={(e) => setPassInput(e.target.value)}
                 className="w-full bg-black border border-zinc-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500"
@@ -588,67 +593,119 @@ export default function Home() {
             </form>
           )}
 
+          {/* ปุ่มสลับมุมมองสถิติผู้เล่น (ซ้อม / แข่ง) */}
+          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
+            <button onClick={() => setPlayerStatTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 สถิติห้องซ้อม</button>
+            <button onClick={() => setPlayerStatTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 สถิติห้องแข่ง</button>
+          </div>
+
           {isAdmin && (
             <form onSubmit={handleUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
-              <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล (Kill / Assists / Damage)</p>
+              <div className="flex justify-between items-center">
+                <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล</p>
+                <select value={targetStatType} onChange={e => setTargetStatType(e.target.value as any)} className="bg-black p-1 rounded text-sky-300 border border-zinc-800 text-[11px]">
+                  <option value="scrims">โหมด: ห้องซ้อม</option>
+                  <option value="tournaments">โหมด: ห้องแข่ง</option>
+                </select>
+              </div>
               <select value={addPlayerKillId} onChange={e => setAddPlayerKillId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                <option value="">-- เลือก Player ที่จะอัปเดตสถิติ --</option>
-                {players.map(p => <option key={p.id} value={p.id}>{p.ign} (K:{p.total_kills || 0} / A:{p.Assists || 0} / Dmg:{p.Damage || 0})</option>)}
+                <option value="">-- เลือก Player --</option>
+                {players.map(p => <option key={p.id} value={p.id}>{p.ign} ({targetStatType === 'scrims' ? `ซ้อม K:${p.total_kills || 0}` : `แข่ง K:${p.tourney_kills || 0}`})</option>)}
               </select>
               <div className="grid grid-cols-3 gap-1.5">
                 <input type="number" placeholder="+ Kills" value={addedKillsVal} onChange={e => setAddedKillsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
                 <input type="number" placeholder="+ Assists" value={addedAssistsVal} onChange={e => setAddedAssistsVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
                 <input type="number" placeholder="+ Damage" value={addedDamageVal} onChange={e => setAddedDamageVal(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
               </div>
-              <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ</button>
+              <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ ({targetStatType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'})</button>
             </form>
           )}
 
           <div className="space-y-2.5">
-            {rankedPlayers.length === 0 ? (
-              <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Player</div>
+            {playerStatTab === 'scrims' ? (
+              rankedScrimPlayers.length === 0 ? (
+                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Player</div>
+              ) : (
+                rankedScrimPlayers.map((p, idx) => {
+                  const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
+                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+                  return (
+                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition ${
+                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
+                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
+                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
+                      'bg-zinc-900 border-zinc-800 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                          isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
+                        }`}>{idx + 1}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-white">{p.ign}</span>
+                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right space-y-0.5">
+                          <div className="flex gap-2 text-[10px]">
+                            <span className="text-zinc-400">K: <strong className="text-sky-400">{p.total_kills || 0}</strong></span>
+                            <span className="text-zinc-400">A: <strong className="text-sky-300">{p.Assists || 0}</strong></span>
+                            <span className="text-zinc-400">Dmg: <strong className="text-sky-200">{p.Damage || 0}</strong></span>
+                          </div>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )
             ) : (
-              rankedPlayers.map((p, idx) => {
-                const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
-                const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
-
-                return (
-                  <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition ${
-                    isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
-                    isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
-                    isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
-                    'bg-zinc-900 border-zinc-800 text-zinc-300'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
-                        isTop1 ? 'bg-red-500 text-white' : 
-                        isTop2 ? 'bg-orange-500 text-white' : 
-                        isTop3 ? 'bg-yellow-500 text-black' : 
-                        'bg-zinc-800 text-zinc-400'
-                      }`}>{idx + 1}</span>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-sm text-white">{p.ign}</span>
-                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
-                        </div>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right space-y-0.5">
-                        <div className="flex gap-2 text-[10px]">
-                          <span className="text-zinc-400">K: <strong className="text-sky-400">{p.total_kills || 0}</strong></span>
-                          <span className="text-zinc-400">A: <strong className="text-sky-300">{p.Assists || 0}</strong></span>
-                          <span className="text-zinc-400">Dmg: <strong className="text-sky-200">{p.Damage || 0}</strong></span>
+              rankedTourneyPlayers.length === 0 ? (
+                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ยังไม่มีข้อมูล Player</div>
+              ) : (
+                rankedTourneyPlayers.map((p, idx) => {
+                  const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
+                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+                  return (
+                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition ${
+                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
+                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
+                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
+                      'bg-zinc-900 border-zinc-800 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
+                          isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
+                        }`}>{idx + 1}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-white">{p.ign}</span>
+                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
                         </div>
                       </div>
-                      {isAdmin && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right space-y-0.5">
+                          <div className="flex gap-2 text-[10px]">
+                            <span className="text-zinc-400">K: <strong className="text-sky-300">{p.tourney_kills || 0}</strong></span>
+                            <span className="text-zinc-400">A: <strong className="text-sky-200">{p.tourney_assists || 0}</strong></span>
+                            <span className="text-zinc-400">Dmg: <strong className="text-sky-100">{p.tourney_damage || 0}</strong></span>
+                          </div>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
+              )
             )}
           </div>
         </main>
@@ -828,10 +885,9 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-1 pt-1 text-[11px] bg-zinc-900 p-1.5 rounded text-center">
-                      <div><span className="text-zinc-400 block text-[9px]">KILLS</span><strong className="text-sky-400">{p.total_kills || 0}</strong></div>
-                      <div><span className="text-zinc-400 block text-[9px]">ASSISTS</span><strong className="text-sky-300">{p.Assists || 0}</strong></div>
-                      <div><span className="text-zinc-400 block text-[9px]">DAMAGE</span><strong className="text-sky-200">{p.Damage || 0}</strong></div>
+                    <div className="grid grid-cols-2 gap-1 pt-1 text-[10px] bg-zinc-900 p-1.5 rounded text-center">
+                      <div><span className="text-zinc-400 block">ซ้อม (K/A/D):</span><strong className="text-sky-400">{p.total_kills || 0} / {p.Assists || 0} / {p.Damage || 0}</strong></div>
+                      <div><span className="text-zinc-400 block">แข่ง (K/A/D):</span><strong className="text-sky-300">{p.tourney_kills || 0} / {p.tourney_assists || 0} / {p.tourney_damage || 0}</strong></div>
                     </div>
                   </div>
                 ))
@@ -912,10 +968,7 @@ export default function Home() {
                       <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
-                            idx === 0 ? 'bg-red-500 text-white' :
-                            idx === 1 ? 'bg-orange-500 text-white' :
-                            idx === 2 ? 'bg-yellow-500 text-black' :
-                            'bg-zinc-800 text-zinc-400'
+                            idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
                           }`}>{idx + 1}</span>
                           <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
                         </div>
@@ -961,10 +1014,7 @@ export default function Home() {
                       <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
-                            idx === 0 ? 'bg-red-500 text-white' :
-                            idx === 1 ? 'bg-orange-500 text-white' :
-                            idx === 2 ? 'bg-yellow-500 text-black' :
-                            'bg-zinc-800 text-zinc-400'
+                            idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
                           }`}>{idx + 1}</span>
                           <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
                         </div>
@@ -992,22 +1042,27 @@ export default function Home() {
               <p className="text-[11px] text-sky-400 mt-0.5">Role: {selectedPlayer.role}</p>
             </div>
             
-            <div className="grid grid-cols-3 gap-2 text-center py-2 bg-black rounded-xl border border-zinc-800">
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Kills</span>
-                <span className="text-base font-black text-sky-400">{selectedPlayer.total_kills || 0}</span>
+            <div className="space-y-2">
+              <div className="bg-black p-2 rounded-xl border border-zinc-800 text-center">
+                <span className="text-[10px] text-sky-400 font-bold block mb-1">🏠 สถิติห้องซ้อม (Scrims)</span>
+                <div className="grid grid-cols-3 gap-1 text-[11px]">
+                  <div><span className="text-[9px] text-zinc-400 block">Kills</span><strong className="text-white">{selectedPlayer.total_kills || 0}</strong></div>
+                  <div><span className="text-[9px] text-zinc-400 block">Assists</span><strong className="text-white">{selectedPlayer.Assists || 0}</strong></div>
+                  <div><span className="text-[9px] text-zinc-400 block">Damage</span><strong className="text-white">{selectedPlayer.Damage || 0}</strong></div>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Assists</span>
-                <span className="text-base font-black text-sky-300">{selectedPlayer.Assists || 0}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Damage</span>
-                <span className="text-base font-black text-sky-200">{selectedPlayer.Damage || 0}</span>
+
+              <div className="bg-black p-2 rounded-xl border border-zinc-800 text-center">
+                <span className="text-[10px] text-sky-300 font-bold block mb-1">🏆 สถิติห้องแข่ง (Tournaments)</span>
+                <div className="grid grid-cols-3 gap-1 text-[11px]">
+                  <div><span className="text-[9px] text-zinc-400 block">Kills</span><strong className="text-white">{selectedPlayer.tourney_kills || 0}</strong></div>
+                  <div><span className="text-[9px] text-zinc-400 block">Assists</span><strong className="text-white">{selectedPlayer.tourney_assists || 0}</strong></div>
+                  <div><span className="text-[9px] text-zinc-400 block">Damage</span><strong className="text-white">{selectedPlayer.tourney_damage || 0}</strong></div>
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               {isAdmin && (
                 <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างสถิติ</button>
               )}
