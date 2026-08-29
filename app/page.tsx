@@ -38,6 +38,8 @@ export default function Home() {
 
   const [teamName, setTeamName] = useState('');
   const [teamTag, setTeamTag] = useState('');
+  const [teamLogoUrl, setTeamLogoUrl] = useState('');
+
   const [ign, setIgn] = useState('');
   const [role, setRole] = useState('ATK');
   const [playerTeamId, setPlayerTeamId] = useState('');
@@ -60,7 +62,6 @@ export default function Home() {
   const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
   const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK');
 
-  // สต็อกสำหรับอัปเดตสถิติผู้เล่นแยกตามโหมด (ซ้อม / ทัวร์)
   const [addPlayerKillId, setAddPlayerKillId] = useState('');
   const [targetStatType, setTargetStatType] = useState<'scrims' | 'tournaments'>('scrims');
   const [addedKillsVal, setAddedKillsVal] = useState('');
@@ -137,7 +138,7 @@ export default function Home() {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passInput === 'coachway123') { // รหัสผ่านแอดมิน
+    if (passInput === 'coachway123') {
       setIsAdmin(true);
       setShowLoginModal(false);
       setPassInput('');
@@ -159,8 +160,12 @@ export default function Home() {
     e.preventDefault();
     if (!requireAdmin()) return;
     if (!teamName.trim() || !teamTag.trim()) return;
-    await supabase.from('teams').insert([{ name: teamName.trim(), tag: teamTag.trim().toUpperCase() }]);
-    setTeamName(''); setTeamTag(''); setShowTeamForm(false);
+    await supabase.from('teams').insert([{ 
+      name: teamName.trim(), 
+      tag: teamTag.trim().toUpperCase(),
+      logo_url: teamLogoUrl.trim() || null 
+    }]);
+    setTeamName(''); setTeamTag(''); setTeamLogoUrl(''); setShowTeamForm(false);
     fetchAllData();
   }
 
@@ -361,7 +366,6 @@ export default function Home() {
     fetchAllData();
   }
 
-  // จัดอันดับผู้เล่นตามโหมด (ซ้อม / ทัวร์)
   const rankedScrimPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
   const rankedTourneyPlayers = [...players].sort((a, b) => (b.tourney_kills || 0) - (a.tourney_kills || 0));
 
@@ -468,6 +472,7 @@ export default function Home() {
             <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
               <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
+              <input type="text" placeholder="ลิงก์โลโก้ทีม (Logo URL ถ้ามี)" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Team</button>
             </form>
           )}
@@ -498,12 +503,17 @@ export default function Home() {
                           isTop3 ? 'bg-yellow-500 text-black' : 
                           'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
-                            <span className="font-bold text-sm text-white">{t.name}</span>
+                        <div className="flex items-center gap-2.5">
+                          {t.logo_url && (
+                            <img src={t.logo_url} alt={t.name} className="w-8 h-8 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
+                              <span className="font-bold text-sm text-white">{t.name}</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -539,12 +549,17 @@ export default function Home() {
                           isTop3 ? 'bg-yellow-500 text-black' : 
                           'bg-zinc-800 text-zinc-400'
                         }`}>{idx + 1}</span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
-                            <span className="font-bold text-sm text-white">{t.name}</span>
+                        <div className="flex items-center gap-2.5">
+                          {t.logo_url && (
+                            <img src={t.logo_url} alt={t.name} className="w-8 h-8 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
+                              <span className="font-bold text-sm text-white">{t.name}</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -593,7 +608,6 @@ export default function Home() {
             </form>
           )}
 
-          {/* ปุ่มสลับมุมมองสถิติผู้เล่น (ซ้อม / แข่ง) */}
           <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
             <button onClick={() => setPlayerStatTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 สถิติห้องซ้อม</button>
             <button onClick={() => setPlayerStatTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 สถิติห้องแข่ง</button>
@@ -848,9 +862,14 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <div>
-                <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
-                <p className="text-[10px] text-zinc-400">แต้มซ้อมรวม: <strong className="text-sky-400">{selectedTeam.totalScrimPts}</strong> | แต้มทัวร์รวม: <strong className="text-sky-300">{selectedTeam.totalTourneyPts}</strong></p>
+              <div className="flex items-center gap-2.5">
+                {selectedTeam.logo_url && (
+                  <img src={selectedTeam.logo_url} alt={selectedTeam.name} className="w-10 h-10 object-contain rounded bg-zinc-950 p-0.5 border border-zinc-800 shrink-0" />
+                )}
+                <div>
+                  <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
+                  <p className="text-[10px] text-zinc-400">แต้มซ้อมรวม: <strong className="text-sky-400">{selectedTeam.totalScrimPts}</strong> | แต้มทัวร์รวม: <strong className="text-sky-300">{selectedTeam.totalTourneyPts}</strong></p>
+                </div>
               </div>
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
