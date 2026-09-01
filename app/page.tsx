@@ -86,23 +86,19 @@ export default function Home() {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [playerModalTab, setPlayerModalTab] = useState<'scrims' | 'tournaments'>('scrims');
 
-  // --- IMAGE LIGHTBOX POPUP STATE ---
+  // --- IMAGE LIGHTBOX POPUP STATE & ERROR HANDLER ---
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [imageHasError, setImageHasError] = useState(false);
 
   const [newTeamPlayerIgn, setNewTeamPlayerIgn] = useState('');
   const [newTeamPlayerRole, setNewTeamPlayerRole] = useState('ATK 1');
   const [newTeamPlayerSubRole, setNewTeamPlayerSubRole] = useState('');
   const [newTeamPlayerAvatar, setNewTeamPlayerAvatar] = useState('');
 
-  // --- ADD PLAYER STATS ---
-  const [addPlayerKillId, setAddPlayerKillId] = useState('');
-  const [targetStatType, setTargetStatType] = useState<'scrims' | 'tournaments'>('scrims');
-  const [addedMatchesVal, setAddedMatchesVal] = useState('');
-  const [addedKillsVal, setAddedKillsVal] = useState('');
-  const [addedAssistsVal, setAddedAssistsVal] = useState('');
-  const [addedDamageVal, setAddedDamageVal] = useState('');
-  const [addedSurvivedVal, setAddedSurvivedVal] = useState('');
-  const [addedRescueVal, setAddedRescueVal] = useState('');
+  // --- BATCH ADD PLAYER STATS BY TEAM ---
+  const [batchStatTeamId, setBatchStatTeamId] = useState('');
+  const [batchTargetType, setBatchTargetType] = useState<'scrims' | 'tournaments'>('scrims');
+  const [batchPlayerValues, setBatchPlayerValues] = useState<{ [playerId: string]: { matches: string; kills: string; assists: string; damage: string; survived: string; rescue: string } }>({});
 
   useEffect(() => {
     fetchAllData();
@@ -115,6 +111,15 @@ export default function Home() {
   useEffect(() => {
     if (selectedScrimTournament) fetchScrimScores(selectedScrimTournament);
   }, [selectedScrimTournament]);
+
+  useEffect(() => {
+    setImageHasError(false);
+  }, [selectedPlayer]);
+
+  // รีเซ็ตฟอร์มกรอกแต้มแบบกลุ่มเมื่อเปลี่ยนทีม
+  useEffect(() => {
+    setBatchPlayerValues({});
+  }, [batchStatTeamId]);
 
   async function fetchAllData() {
     try {
@@ -261,59 +266,63 @@ export default function Home() {
     fetchAllData();
   }
 
-  async function handleUpdatePlayerStats(e: React.FormEvent) {
+  // --- บันทึกสถิติแบบกลุ่มรายทีม ---
+  async function handleBatchUpdatePlayerStats(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAdmin()) return;
-    if (!addPlayerKillId) return alert('กรุณาเลือก Player');
-    
-    const targetPlayer = players.find(p => String(p.id) === String(addPlayerKillId));
-    if (!targetPlayer) return;
+    if (!batchStatTeamId) return alert('กรุณาเลือก Team');
 
-    const addM = parseInt(addedMatchesVal || '0');
-    const addK = parseInt(addedKillsVal || '0');
-    const addA = parseInt(addedAssistsVal || '0');
-    const addD = parseInt(addedDamageVal || '0');
-    const addS = parseInt(addedSurvivedVal || '0');
-    const addR = parseInt(addedRescueVal || '0');
+    const teamPlayers = players.filter(p => String(p.team_id) === String(batchStatTeamId));
+    if (teamPlayers.length === 0) return alert('ไม่มีผู้เล่นในทีมนี้');
 
-    let updateData: any = {};
-    if (targetStatType === 'scrims') {
-      updateData = { 
-        total_matches: Number(targetPlayer.total_matches || 0) + addM,
-        total_kills: Number(targetPlayer.total_kills || 0) + addK,
-        Assists: Number(targetPlayer.Assists || 0) + addA,
-        Damage: Number(targetPlayer.Damage || 0) + addD,
-        Survived: Number(targetPlayer.Survived || 0) + addS,
-        Rescue: Number(targetPlayer.Rescue || 0) + addR
-      };
+    let updatedCount = 0;
+
+    for (const p of teamPlayers) {
+      const vals = batchPlayerValues[p.id];
+      if (!vals) continue;
+
+      const addM = parseInt(vals.matches || '0');
+      const addK = parseInt(vals.kills || '0');
+      const addA = parseInt(vals.assists || '0');
+      const addD = parseInt(vals.damage || '0');
+      const addS = parseInt(vals.survived || '0');
+      const addR = parseInt(vals.rescue || '0');
+
+      if (addM === 0 && addK === 0 && addA === 0 && addD === 0 && addS === 0 && addR === 0) continue;
+
+      let updateData: any = {};
+      if (batchTargetType === 'scrims') {
+        updateData = { 
+          total_matches: Number(p.total_matches || 0) + addM,
+          total_kills: Number(p.total_kills || 0) + addK,
+          Assists: Number(p.Assists || 0) + addA,
+          Damage: Number(p.Damage || 0) + addD,
+          Survived: Number(p.Survived || 0) + addS,
+          Rescue: Number(p.Rescue || 0) + addR
+        };
+      } else {
+        updateData = { 
+          tourney_matches: Number(p.tourney_matches || 0) + addM,
+          tourney_kills: Number(p.tourney_kills || 0) + addK,
+          tourney_assists: Number(p.tourney_assists || 0) + addA,
+          tourney_damage: Number(p.tourney_damage || 0) + addD,
+          tourney_survived: Number(p.tourney_survived || 0) + addS,
+          tourney_rescue: Number(p.tourney_rescue || 0) + addR
+        };
+      }
+
+      const { error } = await supabase.from('players').update(updateData).eq('id', p.id);
+      if (!error) updatedCount++;
+    }
+
+    if (updatedCount > 0) {
+      setBatchPlayerValues({});
+      setBatchStatTeamId('');
+      fetchAllData();
+      alert(`อัปเดตสถิติ (${batchTargetType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'}) ให้ผู้เล่นในทีมเรียบร้อยแล้ว!`);
     } else {
-      updateData = { 
-        tourney_matches: Number(targetPlayer.tourney_matches || 0) + addM,
-        tourney_kills: Number(targetPlayer.tourney_kills || 0) + addK,
-        tourney_assists: Number(targetPlayer.tourney_assists || 0) + addA,
-        tourney_damage: Number(targetPlayer.tourney_damage || 0) + addD,
-        tourney_survived: Number(targetPlayer.tourney_survived || 0) + addS,
-        tourney_rescue: Number(targetPlayer.tourney_rescue || 0) + addR
-      };
+      alert('ยังไม่ได้กรอกข้อมูลเพิ่มแต้มสำหรับผู้เล่นคนใดเลย');
     }
-
-    const { error } = await supabase.from('players').update(updateData).eq('id', targetPlayer.id);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการอัปเดต: ' + error.message);
-      return;
-    }
-
-    setAddPlayerKillId(''); 
-    setAddedMatchesVal('');
-    setAddedKillsVal(''); 
-    setAddedAssistsVal(''); 
-    setAddedDamageVal(''); 
-    setAddedSurvivedVal(''); 
-    setAddedRescueVal('');
-    
-    fetchAllData();
-    alert(`อัปเดตสถิติ (${targetStatType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'}) ให้ ${targetPlayer.ign} เรียบร้อย!`);
   }
 
   async function handleResetPlayerStats(playerId: string, playerIgn: string) {
@@ -364,10 +373,10 @@ export default function Home() {
     e.preventDefault();
     if (!requireAdmin()) return;
     if (!tourneyName.trim()) return;
+    
     const { data, error } = await supabase.from('tournaments').insert([{ 
       name: tourneyName.trim(),
-      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString(),
-      total_matches: parseInt(tourneyMatches || '5')
+      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString()
     }]).select();
 
     if (error) {
@@ -375,7 +384,7 @@ export default function Home() {
       return;
     }
 
-    setTourneyName(''); setTourneyMatches('5'); setShowTourneyForm(false);
+    setTourneyName(''); setShowTourneyForm(false);
     fetchAllData();
     if (data && data[0]) setSelectedTournament(data[0].id);
   }
@@ -559,7 +568,7 @@ export default function Home() {
   const rankedScrimTeams = [...filteredScrimTeams].sort((a, b) => b.totalScrimPts - a.totalScrimPts);
   const rankedTourneyTeams = [...filteredScrimTeams].sort((a, b) => b.totalTourneyPts - a.totalTourneyPts);
 
-  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART (กราฟ 5 แฉก SVG พร้อมปรับขยายเพดาน Survived/Rescue ไม่ให้กราฟฉีก) ---
+  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART ---
   const renderRadarChart = (matches: number, kills: number, assists: number, damage: number, survived: number, rescue: number) => {
     const m = matches > 1 ? matches : 1;
     const avgK = kills / m;
@@ -963,48 +972,114 @@ export default function Home() {
             <button onClick={() => setPlayerStatTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 สถิติห้องแข่ง</button>
           </div>
 
+          {/* ฟอร์มกรอกสถิติแบบกลุ่มรายทีม (เลือกทีมแล้วขึ้นรายชื่อผู้เล่นทั้งหมดในทีมให้กรอก) */}
           {isAdmin && (
-            <form onSubmit={handleUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2.5">
+            <form onSubmit={handleBatchUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-3">
               <div className="flex justify-between items-center">
-                <p className="font-bold text-sky-400">📈 อัปเดตสถิติรายบุคคล</p>
-                <select value={targetStatType} onChange={e => setTargetStatType(e.target.value as any)} className="bg-black p-1 rounded text-sky-300 border border-zinc-800 text-[11px]">
+                <p className="font-bold text-sky-400">📈 เพิ่มสถิติผู้เล่น (เลือกทีมเพื่อกรอกรายทีม)</p>
+                <select value={batchTargetType} onChange={e => setBatchTargetType(e.target.value as any)} className="bg-black p-1 rounded text-sky-300 border border-zinc-800 text-[11px]">
                   <option value="scrims">โหมด: ห้องซ้อม</option>
                   <option value="tournaments">โหมด: ห้องแข่ง</option>
                 </select>
               </div>
-              <select value={addPlayerKillId} onChange={e => setAddPlayerKillId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                <option value="">-- เลือก Player --</option>
-                {players.map(p => <option key={p.id} value={p.id}>{p.ign} ({targetStatType === 'scrims' ? `ซ้อม M:${p.total_matches || 0} K:${p.total_kills || 0}` : `แข่ง M:${p.tourney_matches || 0} K:${p.tourney_kills || 0}`})</option>)}
-              </select>
-              
-              <div className="grid grid-cols-6 gap-1">
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Match</label>
-                  <input type="number" placeholder="+M" value={addedMatchesVal} onChange={e => setAddedMatchesVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Kill</label>
-                  <input type="number" placeholder="+K" value={addedKillsVal} onChange={e => setAddedKillsVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Assist</label>
-                  <input type="number" placeholder="+A" value={addedAssistsVal} onChange={e => setAddedAssistsVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Damage</label>
-                  <input type="number" placeholder="+D" value={addedDamageVal} onChange={e => setAddedDamageVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Survived</label>
-                  <input type="number" placeholder="+S" value={addedSurvivedVal} onChange={e => setAddedSurvivedVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-zinc-400 block mb-0.5">Rescue</label>
-                  <input type="number" placeholder="+R" value={addedRescueVal} onChange={e => setAddedRescueVal(e.target.value)} className="w-full bg-black p-1.5 rounded text-white border border-zinc-800 text-center" />
-                </div>
-              </div>
 
-              <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-1.5 rounded border border-sky-500/30">บันทึกเพิ่มสถิติ ({targetStatType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'})</button>
+              <select 
+                value={batchStatTeamId} 
+                onChange={e => setBatchStatTeamId(e.target.value)} 
+                className="w-full bg-black p-2 rounded text-white border border-zinc-800 font-bold"
+              >
+                <option value="">-- เลือก Team เพื่อกรอกสถิติผู้เล่น --</option>
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>[{t.tag}] {t.name} ({players.filter(p => String(p.team_id) === String(t.id)).length} คน)</option>
+                ))}
+              </select>
+
+              {batchStatTeamId && (
+                <div className="space-y-2 pt-1 border-t border-zinc-800">
+                  {players.filter(p => String(p.team_id) === String(batchStatTeamId)).length === 0 ? (
+                    <p className="text-zinc-500 text-center py-2 italic">ยังไม่มีผู้เล่นในทีมนี้</p>
+                  ) : (
+                    players.filter(p => String(p.team_id) === String(batchStatTeamId)).map(p => {
+                      const pValues = batchPlayerValues[p.id] || { matches: '', kills: '', assists: '', damage: '', survived: '', rescue: '' };
+                      return (
+                        <div key={p.id} className="bg-black p-2 rounded-lg border border-zinc-800 space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-white text-xs">🎯 {p.ign} <span className="text-[10px] text-sky-400">({p.role})</span></span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-1">
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Match</label>
+                              <input 
+                                type="number" 
+                                placeholder="+M" 
+                                value={pValues.matches} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, matches: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Kill</label>
+                              <input 
+                                type="number" 
+                                placeholder="+K" 
+                                value={pValues.kills} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, kills: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Assist</label>
+                              <input 
+                                type="number" 
+                                placeholder="+A" 
+                                value={pValues.assists} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, assists: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Dmg</label>
+                              <input 
+                                type="number" 
+                                placeholder="+D" 
+                                value={pValues.damage} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, damage: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Surv</label>
+                              <input 
+                                type="number" 
+                                placeholder="+S" 
+                                value={pValues.survived} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, survived: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] text-zinc-500 block">Rescue</label>
+                              <input 
+                                type="number" 
+                                placeholder="+R" 
+                                value={pValues.rescue} 
+                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, rescue: e.target.value}})} 
+                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {players.filter(p => String(p.team_id) === String(batchStatTeamId)).length > 0 && (
+                    <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-2 rounded border border-sky-500/30 mt-1">
+                      💾 บันทึกสถิติยกทีม ({batchTargetType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'})
+                    </button>
+                  )}
+                </div>
+              )}
             </form>
           )}
 
@@ -1225,7 +1300,7 @@ export default function Home() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
-                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''}) - {tr.total_matches || 5} เกม</option>)}
+                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''})</option>)}
                 </select>
                 {isAdmin && selectedTournament && (
                   <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
@@ -1238,9 +1313,9 @@ export default function Home() {
               {isAdmin && showTourneyForm && (
                 <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
                   <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-zinc-400 block mb-1">วันที่แข่งขัน</label>
                     <input type="date" value={tourneyDate} onChange={e => setTourneyDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                    <input type="number" placeholder="จำนวนเกม (เช่น 5)" value={tourneyMatches} onChange={e => setTourneyMatches(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800 text-center" />
                   </div>
                   <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
                 </form>
@@ -1274,7 +1349,7 @@ export default function Home() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-black text-sky-400">🏆 {tr.name}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{trDateStr} ({tr.total_matches || 5} เกม)</span>
+                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{trDateStr}</span>
                           </div>
                           <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisTourneyScores.length} Team</strong></p>
                         </div>
@@ -1338,7 +1413,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* ปุ่มสลับโหมด มุมมอง ซ้อม / แข่ง ใน Modal ทีม */}
             <div className="grid grid-cols-2 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
               <button 
                 onClick={() => setTeamModalStatTab('scrims')} 
@@ -1354,7 +1428,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* ปุ่มสลับโหมด ยอดรวม / ค่าเฉลี่ย ต่อเกม */}
             <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
               <button 
                 onClick={() => setTeamViewMode('total')} 
@@ -1432,7 +1505,6 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* แสดงผลตามโหมด (ถ้าเป็น Average จะยุบช่อง Match เหลือ 5 ช่องโชว์ตัวเลขเน้นๆ) */}
                       <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
                         {teamModalStatTab === 'scrims' ? (
                           teamViewMode === 'total' ? (
@@ -1588,7 +1660,7 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div>
                 <h3 className="font-bold text-sky-300 text-sm">🏆 {selectedTourneyDetail.name}</h3>
-                <p className="text-[10px] text-zinc-400">วันที่แข่ง: {selectedTourneyDetail.created_at ? new Date(selectedTourneyDetail.created_at).toISOString().split('T')[0] : ''} | จำนวนเกม: {selectedTourneyDetail.total_matches || 5} เกม</p>
+                <p className="text-[10px] text-zinc-400">วันที่แข่ง: {selectedTourneyDetail.created_at ? new Date(selectedTourneyDetail.created_at).toISOString().split('T')[0] : ''}</p>
               </div>
               <button onClick={() => setSelectedTourneyDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
             </div>
@@ -1632,14 +1704,20 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <div className="text-center border-b border-zinc-800 pb-3 flex flex-col items-center">
-              {selectedPlayer.avatar_url && (
+              {selectedPlayer.avatar_url && !imageHasError ? (
                 <img 
                   src={selectedPlayer.avatar_url} 
                   alt={selectedPlayer.ign} 
+                  onError={() => setImageHasError(true)}
                   onClick={() => setPreviewImage({ url: selectedPlayer.avatar_url, title: `รูปผู้เล่น: ${selectedPlayer.ign}` })}
                   className="w-16 h-16 object-cover rounded-xl bg-zinc-950 p-0.5 border border-zinc-800 mb-2 hover:scale-105 hover:border-sky-400 transition cursor-pointer" 
                   title="คลิกเพื่อดูรูปขนาดใหญ่"
                 />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-zinc-950 border border-zinc-800 mb-2 flex flex-col items-center justify-center text-zinc-500 text-[9px] p-1 text-center">
+                  <span>🖼️</span>
+                  <span className="mt-0.5">ลิงก์รูปเสีย/ไม่มีรูป</span>
+                </div>
               )}
               <h3 className="font-black text-white text-base">{selectedPlayer.ign}</h3>
               <div className="flex items-center gap-1.5 mt-1">
