@@ -64,6 +64,7 @@ export default function Home() {
 
   // Tournament & Scrim Form States
   const [tourneyName, setTourneyName] = useState('');
+  const [tourneyDate, setTourneyDate] = useState(new Date().toISOString().split('T')[0]);
   const [tourneyMatches, setTourneyMatches] = useState('5');
   
   const [scrimName, setScrimName] = useState('');
@@ -317,7 +318,7 @@ export default function Home() {
 
   async function handleResetPlayerStats(playerId: string, playerIgn: string) {
     if (!requireAdmin()) return;
-    if (!confirm(`ต้องการล้างคะแนนสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
+    if (!confirm(`ต้องการลบแต้มสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
 
     const { error } = await supabase.from('players').update({ 
       total_matches: 0, total_kills: 0, Assists: 0, Damage: 0, Survived: 0, Rescue: 0,
@@ -325,13 +326,13 @@ export default function Home() {
     }).eq('id', playerId);
 
     if (error) {
-      alert('เกิดข้อผิดพลาดในการล้างคะแนน: ' + error.message);
+      alert('เกิดข้อผิดพลาดในการล้างแต้ม: ' + error.message);
       return;
     }
 
     setSelectedPlayer(null);
     fetchAllData();
-    alert(`ล้างคะแนนของ ${playerIgn} เรียบร้อยแล้ว!`);
+    alert(`ล้างแต้มของ ${playerIgn} เรียบร้อยแล้ว!`);
   }
 
   async function handleCreatePlayerForTeam(teamId: string) {
@@ -363,10 +364,17 @@ export default function Home() {
     e.preventDefault();
     if (!requireAdmin()) return;
     if (!tourneyName.trim()) return;
-    const { data } = await supabase.from('tournaments').insert([{ 
+    const { data, error } = await supabase.from('tournaments').insert([{ 
       name: tourneyName.trim(),
+      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString(),
       total_matches: parseInt(tourneyMatches || '5')
     }]).select();
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการสร้างทัวร์นาเมนต์: ' + error.message);
+      return;
+    }
+
     setTourneyName(''); setTourneyMatches('5'); setShowTourneyForm(false);
     fetchAllData();
     if (data && data[0]) setSelectedTournament(data[0].id);
@@ -394,11 +402,17 @@ export default function Home() {
     e.preventDefault();
     if (!requireAdmin()) return;
     if (!scrimName.trim()) return;
-    const { data } = await supabase.from('scrim_tournaments').insert([{ 
+    const { data, error } = await supabase.from('scrim_tournaments').insert([{ 
       name: scrimName.trim(), 
       scrim_date: scrimDate,
       total_matches: parseInt(scrimMatches || '5')
     }]).select();
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการสร้างห้องซ้อม: ' + error.message);
+      return;
+    }
+
     setScrimName(''); setScrimMatches('5'); setShowScrimForm(false);
     fetchAllData();
     if (data && data[0]) setSelectedScrimTournament(data[0].id);
@@ -545,7 +559,7 @@ export default function Home() {
   const rankedScrimTeams = [...filteredScrimTeams].sort((a, b) => b.totalScrimPts - a.totalScrimPts);
   const rankedTourneyTeams = [...filteredScrimTeams].sort((a, b) => b.totalTourneyPts - a.totalTourneyPts);
 
-  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART (กราฟ 5 แฉก SVG พร้อมปรับสเกล Survived/Rescue ให้อัตโนมัติ) ---
+  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART (กราฟ 5 แฉก SVG พร้อมปรับขยายเพดาน Survived/Rescue ไม่ให้กราฟฉีก) ---
   const renderRadarChart = (matches: number, kills: number, assists: number, damage: number, survived: number, rescue: number) => {
     const m = matches > 1 ? matches : 1;
     const avgK = kills / m;
@@ -557,8 +571,8 @@ export default function Home() {
     const pK = Math.min(Math.max((avgK / 4) * 100, 10), 100);
     const pA = Math.min(Math.max((avgA / 3) * 100, 10), 100);
     const pD = Math.min(Math.max((avgD / 800) * 100, 10), 100);
-    const pS = Math.min(Math.max((avgS / 1) * 100, 10), 100);
-    const pR = Math.min(Math.max((avgR / 1) * 100, 10), 100);
+    const pS = Math.min(Math.max((avgS / 6) * 100, 10), 100); 
+    const pR = Math.min(Math.max((avgR / 4) * 100, 10), 100); 
 
     const size = 180;
     const center = size / 2;
@@ -898,7 +912,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                 </div>
                 <div>
@@ -909,7 +923,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                 </div>
               </div>
@@ -930,7 +944,7 @@ export default function Home() {
               className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
             />
             <div className="flex gap-1 overflow-x-auto pb-1 text-[10px] bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-              {['ALL', 'IGL', 'ATK 1', 'ATK 2', 'Scout', 'Roaming'].map((r) => (
+              {['ALL', 'IGL', 'ATK 1', 'ATK 2', 'Scout', 'Flex'].map((r) => (
                 <button
                   key={r}
                   onClick={() => setSelectedRoleFilter(r)}
@@ -1211,7 +1225,7 @@ export default function Home() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
-                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.total_matches || 5} เกม)</option>)}
+                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''}) - {tr.total_matches || 5} เกม</option>)}
                 </select>
                 {isAdmin && selectedTournament && (
                   <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
@@ -1224,7 +1238,10 @@ export default function Home() {
               {isAdmin && showTourneyForm && (
                 <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
                   <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <input type="number" placeholder="จำนวนเกม (เช่น 5)" value={tourneyMatches} onChange={e => setTourneyMatches(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800 text-center" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="date" value={tourneyDate} onChange={e => setTourneyDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                    <input type="number" placeholder="จำนวนเกม (เช่น 5)" value={tourneyMatches} onChange={e => setTourneyMatches(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800 text-center" />
+                  </div>
                   <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
                 </form>
               )}
@@ -1251,12 +1268,13 @@ export default function Home() {
                 ) : (
                   tournaments.map(tr => {
                     const thisTourneyScores = allScores.filter(s => String(s.tournament_id) === String(tr.id));
+                    const trDateStr = tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : '';
                     return (
                       <div key={tr.id} onClick={() => setSelectedTourneyDetail(tr)} className="bg-zinc-900 hover:bg-zinc-850 p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer transition shadow-sm group">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-black text-sky-400">🏆 {tr.name}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">({tr.total_matches || 5} เกม)</span>
+                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{trDateStr} ({tr.total_matches || 5} เกม)</span>
                           </div>
                           <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisTourneyScores.length} Team</strong></p>
                         </div>
@@ -1305,7 +1323,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                   <select value={newTeamPlayerSubRole} onChange={e => setNewTeamPlayerSubRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
                     <option value="">-- ไม่มีตำแหน่งรอง --</option>
@@ -1313,7 +1331,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                 </div>
                 <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ เพิ่ม Player ใหม่</button>
@@ -1493,7 +1511,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                 </div>
                 <div>
@@ -1504,7 +1522,7 @@ export default function Home() {
                     <option value="ATK 2">ATK 2</option>
                     <option value="IGL">IGL</option>
                     <option value="Scout">Scout</option>
-                    <option value="Roaming">Roaming</option>
+                    <option value="Flex">Flex</option>
                   </select>
                 </div>
               </div>
@@ -1570,7 +1588,7 @@ export default function Home() {
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div>
                 <h3 className="font-bold text-sky-300 text-sm">🏆 {selectedTourneyDetail.name}</h3>
-                <p className="text-[10px] text-zinc-400">ผลการแข่งขันทางการ | จำนวนเกม: {selectedTourneyDetail.total_matches || 5} เกม</p>
+                <p className="text-[10px] text-zinc-400">วันที่แข่ง: {selectedTourneyDetail.created_at ? new Date(selectedTourneyDetail.created_at).toISOString().split('T')[0] : ''} | จำนวนเกม: {selectedTourneyDetail.total_matches || 5} เกม</p>
               </div>
               <button onClick={() => setSelectedTourneyDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
             </div>
@@ -1729,7 +1747,7 @@ export default function Home() {
 
             <div className="flex gap-2 pt-1">
               {isAdmin && (
-                <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างสถิติ</button>
+                <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างแต้ม</button>
               )}
               <button onClick={() => setSelectedPlayer(null)} className="py-2 bg-zinc-800 text-white rounded font-bold flex-1">ปิดหน้าต่าง</button>
             </div>
