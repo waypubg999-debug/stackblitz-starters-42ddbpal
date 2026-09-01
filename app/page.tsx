@@ -545,7 +545,7 @@ export default function Home() {
   const rankedScrimTeams = [...filteredScrimTeams].sort((a, b) => b.totalScrimPts - a.totalScrimPts);
   const rankedTourneyTeams = [...filteredScrimTeams].sort((a, b) => b.totalTourneyPts - a.totalTourneyPts);
 
-  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART (กราฟ 5 แฉก SVG) ---
+  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART (กราฟ 5 แฉก SVG พร้อมปรับสเกล Survived/Rescue ให้อัตโนมัติ) ---
   const renderRadarChart = (matches: number, kills: number, assists: number, damage: number, survived: number, rescue: number) => {
     const m = matches > 1 ? matches : 1;
     const avgK = kills / m;
