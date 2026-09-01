@@ -579,7 +579,7 @@ export default function Home() {
     const pK = Math.min(Math.max((avgK / 4) * 100, 10), 100);
     const pA = Math.min(Math.max((avgA / 3) * 100, 10), 100);
     const pD = Math.min(Math.max((avgD / 800) * 100, 10), 100);
-    const pS = Math.min(Math.max((avgS / 6) * 100, 10), 100); 
+    const pS = Math.min(Math.max((avgS / 30) * 100, 10), 100); 
     const pR = Math.min(Math.max((avgR / 4) * 100, 10), 100); 
 
     const size = 180;
