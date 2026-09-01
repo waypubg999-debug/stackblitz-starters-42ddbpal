@@ -116,7 +116,6 @@ export default function Home() {
     setImageHasError(false);
   }, [selectedPlayer]);
 
-  // รีเซ็ตฟอร์มกรอกแต้มแบบกลุ่มเมื่อเปลี่ยนทีม
   useEffect(() => {
     setBatchPlayerValues({});
   }, [batchStatTeamId]);
@@ -266,7 +265,6 @@ export default function Home() {
     fetchAllData();
   }
 
-  // --- บันทึกสถิติแบบกลุ่มรายทีม ---
   async function handleBatchUpdatePlayerStats(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAdmin()) return;
@@ -475,7 +473,7 @@ export default function Home() {
     fetchAllData();
   }
 
-  // --- TIME FILTER HELPER LOGIC (สำหรับฝั่งทีมเท่านั้น) ---
+  // --- TIME FILTER HELPER LOGIC ---
   const now = new Date();
   
   const filterScrimIds = scrimTournaments.filter(st => {
@@ -502,7 +500,6 @@ export default function Home() {
     return true;
   }).map(tr => tr.id);
 
-  // ฝั่งผู้เล่น + ระบบกรอง Role, Search Bar และ Tie-break (Kill -> Assist -> Damage)
   const filteredPlayers = players.filter(p => {
     const matchesRole = selectedRoleFilter === 'ALL' || p.role === selectedRoleFilter || p.sub_role === selectedRoleFilter;
     const matchesSearch = playerSearchQuery.trim() === '' || p.ign.toLowerCase().includes(playerSearchQuery.toLowerCase().trim());
@@ -555,7 +552,9 @@ export default function Home() {
       ...team,
       totalTourneyPts,
       totalScrimPts,
-      roster: players.filter(p => String(p.team_id) === String(team.id))
+      roster: players.filter(p => String(p.team_id) === String(team.id)),
+      scrimHistory: allScrimScores.filter(s => String(s.team_id) === String(team.id)),
+      tourneyHistory: allScores.filter(s => String(s.team_id) === String(team.id))
     };
   });
 
@@ -972,7 +971,6 @@ export default function Home() {
             <button onClick={() => setPlayerStatTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 สถิติห้องแข่ง</button>
           </div>
 
-          {/* ฟอร์มกรอกสถิติแบบกลุ่มรายทีม (เลือกทีมแล้วขึ้นรายชื่อผู้เล่นทั้งหมดในทีมให้กรอก) */}
           {isAdmin && (
             <form onSubmit={handleBatchUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-3">
               <div className="flex justify-between items-center">
@@ -1364,7 +1362,7 @@ export default function Home() {
         </main>
       )}
 
-      {/* MODAL: TEAM DETAILS */}
+      {/* MODAL: TEAM DETAILS (รวมผู้เล่นคลิกดูป๊อปอัพ และประวัติห้องซ้อม/แข่งไว้อยู่ล่างสุด) */}
       {selectedTeam && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
@@ -1443,12 +1441,13 @@ export default function Home() {
               </button>
             </div>
 
+            {/* รายชื่อผู้เล่นในทีม (คลิกที่ชื่อ/การ์ดเพื่อเปิดดูโปรไฟล์ป๊อปอัพเต็มตัวผู้เล่นได้) */}
             <div className="space-y-2">
-              <p className="text-zinc-300 font-bold">👥 Player ใน Team ({players.filter(p => String(p.team_id) === String(selectedTeam.id)).length}):</p>
-              {players.filter(p => String(p.team_id) === String(selectedTeam.id)).length === 0 ? (
+              <p className="text-zinc-300 font-bold">👥 Player ใน Team ({selectedTeam.roster.length}):</p>
+              {selectedTeam.roster.length === 0 ? (
                 <p className="text-zinc-500 italic text-center py-2">ยังไม่มี Player ใน Team นี้</p>
               ) : (
-                players.filter(p => String(p.team_id) === String(selectedTeam.id)).map(p => {
+                selectedTeam.roster.map((p: any) => {
                   const sMatch = p.total_matches || 0;
                   const sDiv = sMatch > 0 ? sMatch : 1;
 
@@ -1470,28 +1469,33 @@ export default function Home() {
                   const tR = teamViewMode === 'total' ? (p.tourney_rescue || 0) : Number((p.tourney_rescue / tDiv).toFixed(1));
 
                   return (
-                    <div key={p.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
+                    <div 
+                      key={p.id} 
+                      onClick={() => setSelectedPlayer(p)} 
+                      className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5 cursor-pointer hover:border-sky-500/50 transition group"
+                      title="คลิกเพื่อดูโปรไฟล์และพลังแฝงผู้เล่น"
+                    >
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2.5">
                           {p.avatar_url && (
                             <img 
                               src={p.avatar_url} 
                               alt={p.ign} 
-                              onClick={() => setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` })}
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
                               className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
                               title="คลิกเพื่อดูรูปขนาดใหญ่"
                             />
                           )}
                           <div>
                             <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-white font-bold text-sm">{p.ign}</span>
+                              <span className="text-white font-bold text-sm group-hover:text-sky-400 transition">{p.ign}</span>
                               <span className="text-[10px] text-sky-400 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
                               {p.sub_role && <span className="text-[10px] text-zinc-400 bg-zinc-900 px-1.5 py-0.5 rounded">รอง: {p.sub_role}</span>}
                             </div>
                           </div>
                         </div>
-                        {isAdmin && (
-                          <div className="flex gap-1">
+                        {isAdmin ? (
+                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                             <button onClick={() => { 
                               setEditingPlayer(p); 
                               setEditIgn(p.ign); 
@@ -1502,6 +1506,8 @@ export default function Home() {
                             <button onClick={() => handleResetPlayerStats(p.id, p.ign)} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">ล้างแต้ม</button>
                             <button onClick={() => handleRemovePlayerFromTeam(p.id)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20">ปลดออก</button>
                           </div>
+                        ) : (
+                          <span className="text-[10px] text-sky-400 font-bold opacity-0 group-hover:opacity-100 transition">🔍 ดูโปรไฟล์</span>
                         )}
                       </div>
 
@@ -1552,7 +1558,49 @@ export default function Home() {
               )}
             </div>
 
-            <button onClick={() => setSelectedTeam(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+            {/* ประวัติการลงห้องซ้อมและแข่ง (ย้ายมาไว้ล่างสุดของป๊อปอัพทีมตามที่ขอ) */}
+            <div className="border-t border-zinc-800 pt-3 space-y-3">
+              <p className="text-zinc-300 font-bold">📜 ประวัติการลงห้องซ้อมและแข่งของทีม:</p>
+              
+              <div className="space-y-2">
+                <p className="text-[11px] text-sky-400 font-bold">🏠 ห้องซ้อมที่เคยลง ({selectedTeam.scrimHistory.length}):</p>
+                {selectedTeam.scrimHistory.length === 0 ? (
+                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติห้องซ้อม</p>
+                ) : (
+                  selectedTeam.scrimHistory.map((sItem: any) => {
+                    const stInfo = scrimTournaments.find(st => String(st.id) === String(sItem.scrim_tournament_id));
+                    const totalS = (sItem.kill_points || 0) + (sItem.placement_points || 0);
+                    return (
+                      <div key={sItem.id} className="bg-black p-2 rounded border border-zinc-800 flex justify-between items-center text-[11px]">
+                        <span className="text-zinc-300">🏠 {stInfo?.name || 'ห้องซ้อม'} ({stInfo?.scrim_date || ''})</span>
+                        <span className="font-black text-sky-400">{totalS} แต้ม (K:{sItem.kill_points} P:{sItem.placement_points})</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <p className="text-[11px] text-sky-300 font-bold">🏆 ทัวร์นาเมนต์ที่เคยลง ({selectedTeam.tourneyHistory.length}):</p>
+                {selectedTeam.tourneyHistory.length === 0 ? (
+                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติทัวร์นาเมนต์</p>
+                ) : (
+                  selectedTeam.tourneyHistory.map((tItem: any) => {
+                    const trInfo = tournaments.find(tr => String(tr.id) === String(tItem.tournament_id));
+                    const totalT = (tItem.kill_points || 0) + (tItem.placement_points || 0);
+                    const trDate = trInfo?.created_at ? new Date(trInfo.created_at).toISOString().split('T')[0] : '';
+                    return (
+                      <div key={tItem.id} className="bg-black p-2 rounded border border-zinc-800 flex justify-between items-center text-[11px]">
+                        <span className="text-zinc-300">🏆 {trInfo?.name || 'ทัวร์นาเมนต์'} ({trDate})</span>
+                        <span className="font-black text-sky-300">{totalT} แต้ม (K:{tItem.kill_points} P:{tItem.placement_points})</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <button onClick={() => setSelectedTeam(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold mt-2">ปิดหน้าต่าง</button>
           </div>
         </div>
       )}
