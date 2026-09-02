@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'matches'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'matches' | 'vault'>('teams');
   const [teamSubTab, setTeamSubTab] = useState<'scrims' | 'tournaments'>('scrims');
   const [matchSubTab, setMatchSubTab] = useState<'scrims' | 'tournaments'>('scrims');
   const [playerStatTab, setPlayerStatTab] = useState<'scrims' | 'tournaments'>('scrims');
@@ -29,6 +29,10 @@ export default function Home() {
 
   const [selectedTournament, setSelectedTournament] = useState<string>('');
   const [selectedScrimTournament, setSelectedScrimTournament] = useState<string>('');
+
+  // --- STORAGE VAULT STATES ---
+  const [vaultFiles, setVaultFiles] = useState<any[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // --- ADMIN SECURITY STATES ---
   const [isAdmin, setIsAdmin] = useState(false);
@@ -65,11 +69,13 @@ export default function Home() {
   // Tournament & Scrim Form States
   const [tourneyName, setTourneyName] = useState('');
   const [tourneyDate, setTourneyDate] = useState(new Date().toISOString().split('T')[0]);
-  const [tourneyMatches, setTourneyMatches] = useState('5');
+  const [tourneyPrize, setTourneyPrize] = useState('');
+  const [tourneyImageUrl, setTourneyImageUrl] = useState('');
   
   const [scrimName, setScrimName] = useState('');
   const [scrimDate, setScrimDate] = useState(new Date().toISOString().split('T')[0]);
   const [scrimMatches, setScrimMatches] = useState('5');
+  const [scrimImageUrl, setScrimImageUrl] = useState('');
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [killPts, setKillPts] = useState('');
@@ -102,6 +108,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchAllData();
+    fetchVaultFiles();
   }, []);
 
   useEffect(() => {
@@ -153,6 +160,65 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function fetchVaultFiles() {
+    try {
+      const { data, error } = await supabase.storage.from('esports-assets').list('', {
+        limit: 100,
+        sortBy: { column: 'created_at', order: 'desc' }
+      });
+      if (error) {
+        console.error('Error fetching vault:', error.message);
+        return;
+      }
+      if (data) {
+        const filesWithUrl = data.map(file => {
+          const { data: pubData } = supabase.storage.from('esports-assets').getPublicUrl(file.name);
+          return {
+            ...file,
+            publicUrl: pubData.publicUrl
+          };
+        });
+        setVaultFiles(filesWithUrl);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleUploadToVault(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireAdmin()) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImage(true);
+    const file = files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+    const { error } = await supabase.storage.from('esports-assets').upload(fileName, file);
+
+    if (error) {
+      alert('อัปโหลดรูปไม่สำเร็จ: ' + error.message);
+    } else {
+      alert('อัปโหลดรูปเข้าคลังสำเร็จ!');
+      fetchVaultFiles();
+    }
+    setUploadingImage(false);
+    e.target.value = '';
+  }
+
+  async function handleDeleteVaultFile(fileName: string) {
+    if (!requireAdmin()) return;
+    if (!confirm(`ต้องการลบรูป "${fileName}" จากคลังใช่หรือไม่?`)) return;
+
+    const { error } = await supabase.storage.from('esports-assets').remove([fileName]);
+    if (error) {
+      alert('ลบรูปไม่สำเร็จ: ' + error.message);
+    } else {
+      fetchVaultFiles();
     }
   }
 
@@ -374,7 +440,9 @@ export default function Home() {
     
     const { data, error } = await supabase.from('tournaments').insert([{ 
       name: tourneyName.trim(),
-      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString()
+      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString(),
+      prize_pool: tourneyPrize.trim() || null,
+      image_url: tourneyImageUrl.trim() || null
     }]).select();
 
     if (error) {
@@ -382,7 +450,7 @@ export default function Home() {
       return;
     }
 
-    setTourneyName(''); setShowTourneyForm(false);
+    setTourneyName(''); setTourneyPrize(''); setTourneyImageUrl(''); setShowTourneyForm(false);
     fetchAllData();
     if (data && data[0]) setSelectedTournament(data[0].id);
   }
@@ -412,7 +480,8 @@ export default function Home() {
     const { data, error } = await supabase.from('scrim_tournaments').insert([{ 
       name: scrimName.trim(), 
       scrim_date: scrimDate,
-      total_matches: parseInt(scrimMatches || '5')
+      total_matches: parseInt(scrimMatches || '5'),
+      image_url: scrimImageUrl.trim() || null
     }]).select();
 
     if (error) {
@@ -420,7 +489,7 @@ export default function Home() {
       return;
     }
 
-    setScrimName(''); setScrimMatches('5'); setShowScrimForm(false);
+    setScrimName(''); setScrimMatches('5'); setScrimImageUrl(''); setShowScrimForm(false);
     fetchAllData();
     if (data && data[0]) setSelectedScrimTournament(data[0].id);
   }
@@ -578,8 +647,8 @@ export default function Home() {
 
     const pK = Math.min(Math.max((avgK / 4) * 100, 10), 100);
     const pA = Math.min(Math.max((avgA / 3) * 100, 10), 100);
-    const pD = Math.min(Math.max((avgD / 500) * 100, 10), 100);
-    const pS = Math.min(Math.max((avgS / 30) * 100, 10), 100); 
+    const pD = Math.min(Math.max((avgD / 700) * 100, 10), 100);
+    const pS = Math.min(Math.max((avgS / 30) * 100, 10), 100);
     const pR = Math.min(Math.max((avgR / 4) * 100, 10), 100); 
 
     const size = 180;
@@ -687,25 +756,31 @@ export default function Home() {
           </div>
         </div>
 
-        {/* เมนูบาร์หลัก 3 เมนู */}
-        <div className="grid grid-cols-3 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+        {/* เมนูบาร์หลัก 4 เมนู (เพิ่มคลังรูปภาพ Vault) */}
+        <div className="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
           <button 
             onClick={() => setActiveTab('teams')} 
-            className={`py-2 text-xs font-bold rounded-lg transition text-center ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
           >
             🛡️ Team
           </button>
           <button 
             onClick={() => setActiveTab('players')} 
-            className={`py-2 text-xs font-bold rounded-lg transition text-center ${activeTab === 'players' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'players' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
           >
             🎯 Player
           </button>
           <button 
             onClick={() => setActiveTab('matches')} 
-            className={`py-2 text-xs font-bold rounded-lg transition text-center ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
           >
-            📊 SCRIM&TOUR
+            📊 SCRIM
+          </button>
+          <button 
+            onClick={() => setActiveTab('vault')} 
+            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'vault' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+          >
+            📁 คลังรูป
           </button>
         </div>
       </header>
@@ -761,7 +836,7 @@ export default function Home() {
             <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
               <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
-              <input type="text" placeholder="ลิงก์โลโก้ทีม (Logo URL ถ้ามี)" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="text" placeholder="ลิงก์โลโก้ทีม (Logo URL)" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Team</button>
             </form>
           )}
@@ -911,7 +986,7 @@ export default function Home() {
           {isAdmin && showPlayerForm && (
             <form onSubmit={handleAddPlayer} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
               <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL ถ้ามี)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+              <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-zinc-400 block mb-1">ตำแหน่งหลัก (Role)</label>
@@ -1250,6 +1325,7 @@ export default function Home() {
                     <input type="date" value={scrimDate} onChange={e => setScrimDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
                     <input type="number" placeholder="จำนวนเกม (เช่น 5)" value={scrimMatches} onChange={e => setScrimMatches(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800 text-center" />
                   </div>
+                  <input type="text" placeholder="ลิงก์รูปตารางคะแนนห้องซ้อม (Image URL)" value={scrimImageUrl} onChange={e => setScrimImageUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
                   <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างห้องซ้อม</button>
                 </form>
               )}
@@ -1283,7 +1359,7 @@ export default function Home() {
                             <span className="font-black text-sky-400">🏠 {st.name}</span>
                             <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{st.scrim_date} ({st.total_matches || 5} เกม)</span>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisScrimScores.length} Team</strong></p>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisScrimScores.length} Team</strong> {st.image_url && <span className="text-sky-300 ml-1">📸 [มีรูปตาราง]</span>}</p>
                         </div>
                         <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
                       </div>
@@ -1298,7 +1374,7 @@ export default function Home() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
-                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''})</option>)}
+                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''}) {tr.prize_pool ? `💰 ${tr.prize_pool}` : ''}</option>)}
                 </select>
                 {isAdmin && selectedTournament && (
                   <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
@@ -1311,10 +1387,17 @@ export default function Home() {
               {isAdmin && showTourneyForm && (
                 <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
                   <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <div>
-                    <label className="text-[10px] text-zinc-400 block mb-1">วันที่แข่งขัน</label>
-                    <input type="date" value={tourneyDate} onChange={e => setTourneyDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">วันที่แข่งขัน</label>
+                      <input type="date" value={tourneyDate} onChange={e => setTourneyDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">เงินรางวัล (Prize Pool)</label>
+                      <input type="text" placeholder="เช่น 5,000 บาท" value={tourneyPrize} onChange={e => setTourneyPrize(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+                    </div>
                   </div>
+                  <input type="text" placeholder="ลิงก์รูปตารางคะแนนทัวร์ (Image URL)" value={tourneyImageUrl} onChange={e => setTourneyImageUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
                   <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
                 </form>
               )}
@@ -1349,7 +1432,11 @@ export default function Home() {
                             <span className="font-black text-sky-400">🏆 {tr.name}</span>
                             <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{trDateStr}</span>
                           </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisTourneyScores.length} Team</strong></p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[10px] text-zinc-400">จำนวน Team: <strong className="text-sky-400">{thisTourneyScores.length}</strong></p>
+                            {tr.prize_pool && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-bold">💰 {tr.prize_pool}</span>}
+                            {tr.image_url && <span className="text-[10px] text-sky-300">📸 [มีรูปตาราง]</span>}
+                          </div>
                         </div>
                         <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
                       </div>
@@ -1362,7 +1449,83 @@ export default function Home() {
         </main>
       )}
 
-      {/* MODAL: TEAM DETAILS (รวมผู้เล่นคลิกดูป๊อปอัพ และประวัติห้องซ้อม/แข่งไว้อยู่ล่างสุด) */}
+      {/* ================= TAB 4: IMAGE VAULT (คลังรูปภาพ) ================= */}
+      {activeTab === 'vault' && (
+        <main className="space-y-4 text-xs">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xs font-bold text-sky-400">📁 คลังเก็บรูปภาพส่วนกลาง (Image Vault)</h2>
+              <p className="text-[10px] text-zinc-400 mt-0.5">อัปโหลดรูปแล้วกด "คัดลอกลิงก์" ไปวางใช้งานได้เลย รูปไม่มีวันหาย!</p>
+            </div>
+          </div>
+
+          {isAdmin ? (
+            <div className="bg-zinc-900 p-4 rounded-xl border border-sky-500/30 text-center space-y-3">
+              <label className="block font-bold text-zinc-200">➕ อัปโหลดรูปภาพใหม่เข้าคลัง</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleUploadToVault} 
+                disabled={uploadingImage}
+                className="w-full bg-black p-2 rounded text-zinc-300 border border-zinc-800 text-xs file:mr-4 file:py-1 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-black hover:file:bg-sky-400 cursor-pointer" 
+              />
+              {uploadingImage && <p className="text-sky-400 animate-pulse text-[11px]">กำลังอัปโหลดรูปภาพ...</p>}
+            </div>
+          ) : (
+            <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800 text-center text-zinc-400 text-[11px]">
+              🔒 เข้าสู่ระบบแอดมินเพื่ออัปโหลดรูปภาพเข้าคลัง
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <h3 className="font-bold text-zinc-300">🖼️ รายการรูปภาพทั้งหมดในคลัง ({vaultFiles.length}):</h3>
+            {vaultFiles.length === 0 ? (
+              <div className="bg-zinc-900/40 p-8 rounded-xl border border-zinc-800 text-center text-zinc-500">
+                ยังไม่มีรูปภาพในคลัง ลองอัปโหลดรูปแรกกันเลย!
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {vaultFiles.map((file) => (
+                  <div key={file.name} className="bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 flex flex-col gap-2 shadow-sm">
+                    <img 
+                      src={file.publicUrl} 
+                      alt={file.name} 
+                      onClick={() => setPreviewImage({ url: file.publicUrl, title: file.name })}
+                      className="w-full h-28 object-cover rounded-lg bg-black cursor-pointer hover:opacity-90 transition border border-zinc-800"
+                      title="คลิกเพื่อดูรูปขนาดใหญ่"
+                    />
+                    <div className="space-y-1">
+                      <p className="text-[9px] text-zinc-400 truncate" title={file.name}>{file.name}</p>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(file.publicUrl);
+                            alert('คัดลอกลิงก์รูปสำเร็จ!');
+                          }} 
+                          className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px] transition"
+                        >
+                          📋 คัดลอกลิงก์
+                        </button>
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeleteVaultFile(file.name)} 
+                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded text-[10px] border border-red-500/30 transition"
+                            title="ลบรูป"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* MODAL: TEAM DETAILS */}
       {selectedTeam && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
@@ -1441,7 +1604,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* รายชื่อผู้เล่นในทีม (คลิกที่ชื่อ/การ์ดเพื่อเปิดดูโปรไฟล์ป๊อปอัพเต็มตัวผู้เล่นได้) */}
             <div className="space-y-2">
               <p className="text-zinc-300 font-bold">👥 Player ใน Team ({selectedTeam.roster.length}):</p>
               {selectedTeam.roster.length === 0 ? (
@@ -1558,7 +1720,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* ประวัติการลงห้องซ้อมและแข่ง (ย้ายมาไว้ล่างสุดของป๊อปอัพทีมตามที่ขอ) */}
             <div className="border-t border-zinc-800 pt-3 space-y-3">
               <p className="text-zinc-300 font-bold">📜 ประวัติการลงห้องซ้อมและแข่งของทีม:</p>
               
@@ -1667,6 +1828,19 @@ export default function Home() {
               <button onClick={() => setSelectedScrimDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
             </div>
 
+            {selectedScrimDetail.image_url && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-sky-400 font-bold">📸 รูปตารางคะแนนห้องซ้อม:</p>
+                <img 
+                  src={selectedScrimDetail.image_url} 
+                  alt={selectedScrimDetail.name} 
+                  onClick={() => setPreviewImage({ url: selectedScrimDetail.image_url, title: `ตารางห้องซ้อม: ${selectedScrimDetail.name}` })}
+                  className="w-full h-36 object-cover rounded-lg bg-black border border-zinc-800 cursor-pointer hover:border-sky-400 transition"
+                  title="คลิกเพื่อดูรูปขนาดใหญ่"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <p className="text-zinc-300 font-bold">📊 ผลคะแนนในห้องซ้อมนี้:</p>
               {allScrimScores.filter(s => String(s.scrim_tournament_id) === String(selectedScrimDetail.id)).length === 0 ? (
@@ -1709,9 +1883,25 @@ export default function Home() {
               <div>
                 <h3 className="font-bold text-sky-300 text-sm">🏆 {selectedTourneyDetail.name}</h3>
                 <p className="text-[10px] text-zinc-400">วันที่แข่ง: {selectedTourneyDetail.created_at ? new Date(selectedTourneyDetail.created_at).toISOString().split('T')[0] : ''}</p>
+                {selectedTourneyDetail.prize_pool && (
+                  <p className="text-[11px] text-emerald-400 font-bold mt-0.5">💰 เงินรางวัล: {selectedTourneyDetail.prize_pool}</p>
+                )}
               </div>
               <button onClick={() => setSelectedTourneyDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
             </div>
+
+            {selectedTourneyDetail.image_url && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-sky-300 font-bold">📸 รูปตารางคะแนนทัวร์นาเมนต์:</p>
+                <img 
+                  src={selectedTourneyDetail.image_url} 
+                  alt={selectedTourneyDetail.name} 
+                  onClick={() => setPreviewImage({ url: selectedTourneyDetail.image_url, title: `ตารางทัวร์: ${selectedTourneyDetail.name}` })}
+                  className="w-full h-36 object-cover rounded-lg bg-black border border-zinc-800 cursor-pointer hover:border-sky-400 transition"
+                  title="คลิกเพื่อดูรูปขนาดใหญ่"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <p className="text-zinc-300 font-bold">📊 ผลคะแนนในทัวร์นี้:</p>
@@ -1747,7 +1937,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL: PLAYER FULL PROFILE DETAILS + 5-AXIS RADAR CHART */}
+      {/* MODAL: PLAYER FULL PROFILE DETAILS + HISTORIES */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
@@ -1828,6 +2018,29 @@ export default function Home() {
                       <strong className="text-sm font-black text-sky-200">{selectedPlayer.total_matches ? Math.round(selectedPlayer.Damage / selectedPlayer.total_matches) : 0}</strong>
                     </div>
                   </div>
+
+                  {/* แสดงประวัติห้องซ้อมของทีมที่ผู้เล่นสังกัด */}
+                  <div className="pt-2 border-t border-zinc-900 space-y-1.5">
+                    <p className="text-[11px] text-sky-400 font-bold">📜 ห้องซ้อมที่สังกัดเคยลง:</p>
+                    {selectedPlayer.team_id ? (
+                      allScrimScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).length === 0 ? (
+                        <p className="text-[10px] text-zinc-500 italic">ทีมยังไม่มีประวัติลงห้องซ้อม</p>
+                      ) : (
+                        allScrimScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).map(sItem => {
+                          const stInfo = scrimTournaments.find(st => String(st.id) === String(sItem.scrim_tournament_id));
+                          const totalS = (sItem.kill_points || 0) + (sItem.placement_points || 0);
+                          return (
+                            <div key={sItem.id} className="bg-zinc-950 p-2 rounded border border-zinc-900 flex justify-between items-center text-[10px]">
+                              <span className="text-zinc-300">🏠 {stInfo?.name || 'ห้องซ้อม'} ({stInfo?.scrim_date || ''})</span>
+                              <span className="font-black text-sky-400">{totalS} แต้ม</span>
+                            </div>
+                          );
+                        })
+                      )
+                    ) : (
+                      <p className="text-[10px] text-zinc-500 italic">ผู้เล่นยังไม่สังกัด Team ใด (Free Agent)</p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
@@ -1866,6 +2079,30 @@ export default function Home() {
                       <span className="text-[9px] text-zinc-400 block">Dmg/Game</span>
                       <strong className="text-sm font-black text-sky-100">{selectedPlayer.tourney_matches ? Math.round(selectedPlayer.tourney_damage / selectedPlayer.tourney_matches) : 0}</strong>
                     </div>
+                  </div>
+
+                  {/* แสดงประวัติทัวร์นาเมนต์ของทีมที่ผู้เล่นสังกัด */}
+                  <div className="pt-2 border-t border-zinc-900 space-y-1.5">
+                    <p className="text-[11px] text-sky-300 font-bold">📜 ทัวร์นาเมนต์ที่สังกัดเคยลง:</p>
+                    {selectedPlayer.team_id ? (
+                      allScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).length === 0 ? (
+                        <p className="text-[10px] text-zinc-500 italic">ทีมยังไม่มีประวัติลงทัวร์นาเมนต์</p>
+                      ) : (
+                        allScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).map(tItem => {
+                          const trInfo = tournaments.find(tr => String(tr.id) === String(tItem.tournament_id));
+                          const totalT = (tItem.kill_points || 0) + (tItem.placement_points || 0);
+                          const trDate = trInfo?.created_at ? new Date(trInfo.created_at).toISOString().split('T')[0] : '';
+                          return (
+                            <div key={tItem.id} className="bg-zinc-950 p-2 rounded border border-zinc-900 flex justify-between items-center text-[10px]">
+                              <span className="text-zinc-300">🏆 {trInfo?.name || 'ทัวร์นาเมนต์'} ({trDate})</span>
+                              <span className="font-black text-sky-300">{totalT} แต้ม</span>
+                            </div>
+                          );
+                        })
+                      )
+                    ) : (
+                      <p className="text-[10px] text-zinc-500 italic">ผู้เล่นยังไม่สังกัด Team ใด (Free Agent)</p>
+                    )}
                   </div>
                 </div>
               )}
