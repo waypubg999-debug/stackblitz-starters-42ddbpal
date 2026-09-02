@@ -1455,7 +1455,7 @@ export default function Home() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xs font-bold text-sky-400">📁 คลังเก็บรูปภาพส่วนกลาง (Image Vault)</h2>
-              <p className="text-[10px] text-zinc-400 mt-0.5">อัปโหลดรูปแล้วกด "คัดลอกลิงก์" ไปวางใช้งานได้เลย รูปไม่มีวันหาย!</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">อัปโหลดรูปแล้วกด &apos;คัดลอกลิงก์&apos; ไปวางใช้งานได้เลย รูปไม่มีวันหาย!</p>
             </div>
           </div>
 
