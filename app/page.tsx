@@ -756,8 +756,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* เมนูบาร์หลัก 4 เมนู (เพิ่มคลังรูปภาพ Vault) */}
-        <div className="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+        {/* เมนูบาร์หลัก (แสดงปุ่ม "📁 คลังรูป" เฉพาะตอนเป็นแอดมินเท่านั้น) */}
+        <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800`}>
           <button 
             onClick={() => setActiveTab('teams')} 
             className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
@@ -776,12 +776,14 @@ export default function Home() {
           >
             📊 SCRIM
           </button>
-          <button 
-            onClick={() => setActiveTab('vault')} 
-            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'vault' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
-          >
-            📁 คลังรูป
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setActiveTab('vault')} 
+              className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'vault' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            >
+              📁 คลังรูป
+            </button>
+          )}
         </div>
       </header>
 
@@ -1449,8 +1451,8 @@ export default function Home() {
         </main>
       )}
 
-      {/* ================= TAB 4: IMAGE VAULT (คลังรูปภาพ) ================= */}
-      {activeTab === 'vault' && (
+      {/* ================= TAB 4: IMAGE VAULT (คลังรูปภาพเฉพาะแอดมิน) ================= */}
+      {isAdmin && activeTab === 'vault' && (
         <main className="space-y-4 text-xs">
           <div className="flex justify-between items-center">
             <div>
@@ -1459,23 +1461,17 @@ export default function Home() {
             </div>
           </div>
 
-          {isAdmin ? (
-            <div className="bg-zinc-900 p-4 rounded-xl border border-sky-500/30 text-center space-y-3">
-              <label className="block font-bold text-zinc-200">➕ อัปโหลดรูปภาพใหม่เข้าคลัง</label>
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleUploadToVault} 
-                disabled={uploadingImage}
-                className="w-full bg-black p-2 rounded text-zinc-300 border border-zinc-800 text-xs file:mr-4 file:py-1 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-black hover:file:bg-sky-400 cursor-pointer" 
-              />
-              {uploadingImage && <p className="text-sky-400 animate-pulse text-[11px]">กำลังอัปโหลดรูปภาพ...</p>}
-            </div>
-          ) : (
-            <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800 text-center text-zinc-400 text-[11px]">
-              🔒 เข้าสู่ระบบแอดมินเพื่ออัปโหลดรูปภาพเข้าคลัง
-            </div>
-          )}
+          <div className="bg-zinc-900 p-4 rounded-xl border border-sky-500/30 text-center space-y-3">
+            <label className="block font-bold text-zinc-200">➕ อัปโหลดรูปภาพใหม่เข้าคลัง</label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleUploadToVault} 
+              disabled={uploadingImage}
+              className="w-full bg-black p-2 rounded text-zinc-300 border border-zinc-800 text-xs file:mr-4 file:py-1 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-black hover:file:bg-sky-400 cursor-pointer" 
+            />
+            {uploadingImage && <p className="text-sky-400 animate-pulse text-[11px]">กำลังอัปโหลดรูปภาพ...</p>}
+          </div>
 
           <div className="space-y-3">
             <h3 className="font-bold text-zinc-300">🖼️ รายการรูปภาพทั้งหมดในคลัง ({vaultFiles.length}):</h3>
@@ -1506,15 +1502,13 @@ export default function Home() {
                         >
                           📋 คัดลอกลิงก์
                         </button>
-                        {isAdmin && (
-                          <button 
-                            onClick={() => handleDeleteVaultFile(file.name)} 
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded text-[10px] border border-red-500/30 transition"
-                            title="ลบรูป"
-                          >
-                            🗑️
-                          </button>
-                        )}
+                        <button 
+                          onClick={() => handleDeleteVaultFile(file.name)} 
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded text-[10px] border border-red-500/30 transition"
+                          title="ลบรูป"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   </div>
