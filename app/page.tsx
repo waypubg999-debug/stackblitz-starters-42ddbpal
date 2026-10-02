@@ -360,11 +360,53 @@ export default function Home() {
       alert('บันทึกคะแนนและประวัติสะสมสำเร็จ!');
       setShowBatchScoreModal(false);
       setBatchPlayerScores({});
+      
       await fetchAllData();
 
-      const { data: freshPlayers } = await supabase.from('players').select('*');
-      if (freshPlayers && selectedPlayer) {
-        const updatedCurrentPlayer = freshPlayers.find((p: any) => String(p.id) === String(selectedPlayer.id));
+      const { data: tData } = await supabase.from('teams').select('*');
+      const { data: scrimData } = await supabase.from('scrim_scores').select('*');
+      const { data: scoreData } = await supabase.from('tournament_scores').select('*');
+      const { data: pData } = await supabase.from('players').select('*');
+
+      if (tData && pData) {
+        const refreshedTeam = tData.find((t: any) => String(t.id) === String(team.id));
+        if (refreshedTeam) {
+          const teamScrimScores = (scrimData || []).filter((s: any) => String(s.team_id) === String(refreshedTeam.id));
+          const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshedTeam.id));
+          const sortedRoster = pData
+            .filter((p: any) => String(p.team_id) === String(refreshedTeam.id))
+            .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+
+          const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+          const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+          const totalScrimKillPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+          const totalScrimPlacePts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+          const totalTourneyKillPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+          const totalTourneyPlacePts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+          const totalScrimMatches = teamScrimScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
+          const totalTourneyMatches = teamTourneyScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
+
+          setSelectedTeam({
+            ...refreshedTeam,
+            totalTourneyPts,
+            totalScrimPts,
+            totalScrimKillPts,
+            totalScrimPlacePts,
+            totalTourneyKillPts,
+            totalTourneyPlacePts,
+            totalScrimMatches,
+            totalTourneyMatches,
+            avgScrimPts: totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00',
+            avgTourneyPts: totalTourneyMatches > 0 ? (totalTourneyPts / totalTourneyMatches).toFixed(2) : '0.00',
+            roster: sortedRoster,
+            scrimHistory: teamScrimScores,
+            tourneyHistory: teamTourneyScores
+          });
+        }
+      }
+
+      if (pData && selectedPlayer) {
+        const updatedCurrentPlayer = pData.find((p: any) => String(p.id) === String(selectedPlayer.id));
         if (updatedCurrentPlayer) {
           setSelectedPlayer(updatedCurrentPlayer);
         }
