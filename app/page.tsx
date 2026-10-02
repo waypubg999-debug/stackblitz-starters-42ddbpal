@@ -206,7 +206,6 @@ export default function Home() {
     alert('ลบประวัติห้องซ้อมสำเร็จ!');
     await fetchAllData();
 
-    // อัปเดต selectedTeam ให้ข้อมูลรีเฟรชทันที
     const { data: tData } = await supabase.from('teams').select('*');
     const { data: scrimData } = await supabase.from('scrim_scores').select('*');
     const { data: scoreData } = await supabase.from('tournament_scores').select('*');
@@ -326,13 +325,20 @@ export default function Home() {
       for (const player of team.roster) {
         const stats = batchPlayerScores[player.id];
         if (stats) {
+          const newMatches = (Number(player.total_matches) || 0) + (Number(stats.matches) || 0);
+          const newKills = (Number(player.total_kills) || 0) + (Number(stats.kills) || 0);
+          const newAssists = (Number(player.Assists) || 0) + (Number(stats.assists) || 0);
+          const newDamage = (Number(player.Damage) || 0) + (Number(stats.damage) || 0);
+          const newSurvived = (Number(player.Survived) || 0) + (Number(stats.survived) || 0);
+          const newRescue = (Number(player.Rescue) || 0) + (Number(stats.rescue) || 0);
+
           await supabase.from('players').update({
-            total_matches: Number(stats.matches) || 0,
-            total_kills: Number(stats.kills) || 0,
-            Assists: Number(stats.assists) || 0,
-            Damage: Number(stats.damage) || 0,
-            Survived: Number(stats.survived) || 0,
-            Rescue: Number(stats.rescue) || 0,
+            total_matches: newMatches,
+            total_kills: newKills,
+            Assists: newAssists,
+            Damage: newDamage,
+            Survived: newSurvived,
+            Rescue: newRescue,
             last_scrim_session_id: String(selectedScrimSessionId)
           }).eq('id', player.id);
 
@@ -351,8 +357,9 @@ export default function Home() {
         }
       }
 
-      alert('บันทึกคะแนนและประวัติสำเร็จ!');
+      alert('บันทึกคะแนนและประวัติสะสมสำเร็จ!');
       setShowBatchScoreModal(false);
+      setBatchPlayerScores({});
       await fetchAllData();
 
       const { data: freshPlayers } = await supabase.from('players').select('*');
@@ -459,7 +466,7 @@ export default function Home() {
     const pK = Math.min(Math.max(((kills / m) / 4) * 100, 10), 100);
     const pA = Math.min(Math.max(((assists / m) / 3) * 100, 10), 100);
     const pD = Math.min(Math.max(((damage / m) / 700) * 100, 10), 100);
-    const pS = Math.min(Math.max(((survived / m) / 30) * 100, 10), 100);
+    const pS = Math.min(Math.max(((survived / m) / 22) * 100, 10), 100);
     const pR = Math.min(Math.max(((rescue / m) / 4) * 100, 10), 100);
 
     const size = 180; const center = size / 2; const radius = 65;
@@ -940,12 +947,12 @@ export default function Home() {
                         const initialScores: any = {};
                         selectedTeam.roster.forEach((p: any) => {
                           initialScores[p.id] = {
-                            matches: p.total_matches || 0,
-                            kills: p.total_kills || 0,
-                            assists: p.Assists || 0,
-                            damage: p.Damage || 0,
-                            survived: p.Survived || 0,
-                            rescue: p.Rescue || 0
+                            matches: 0,
+                            kills: 0,
+                            assists: 0,
+                            damage: 0,
+                            survived: 0,
+                            rescue: 0
                           };
                         });
                         setBatchPlayerScores(initialScores);
