@@ -45,7 +45,6 @@ export default function Home() {
   const [scrimNameInput, setScrimNameInput] = useState('');
   const [scrimKillPts, setScrimKillPts] = useState(0);
   const [scrimPlacePts, setScrimPlacePts] = useState(0);
-  const [scrimMatchesInput, setScrimMatchesInput] = useState(5);
 
   const [tourneyNameInput, setTourneyNameInput] = useState('');
   const [tourneyKillPts, setTourneyKillPts] = useState(0);
@@ -212,7 +211,7 @@ export default function Home() {
         const totalScrimPlacePts = teamScrimScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
         const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
         const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
-        const totalScrimMatches = teamScrimScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+        const totalScrimMatches = teamScrimScores.length * 5;
         const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
 
         setSelectedTeam({
@@ -251,7 +250,7 @@ export default function Home() {
 
     const totalInputKills = Object.values(batchPlayerScores).reduce((sum, p) => sum + (Number(p.kills) || 0), 0);
 
-    if (totalInputKills > maxScrimKills) {
+    if (maxScrimKills > 0 && totalInputKills > maxScrimKills) {
       alert(`❌ คะแนนคิลรวมของผู้เล่นทุกคน (${totalInputKills}) ห้ามเกินคะแนนคิลของห้องซ้อมนี้ (${maxScrimKills} คิล)`);
       return;
     }
@@ -300,14 +299,13 @@ export default function Home() {
       scrim_name: scrimNameInput.trim(),
       team_id: teamId,
       kill_points: Number(scrimKillPts) || 0,
-      placement_points: Number(scrimPlacePts) || 0,
-      matches: Number(scrimMatchesInput) || 5
+      placement_points: Number(scrimPlacePts) || 0
     }]);
     if (error) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
       return;
     }
-    setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0); setScrimMatchesInput(5);
+    setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0);
     alert('บันทึกคะแนนห้องซ้อมสำเร็จ!');
     fetchAllData();
   }
@@ -344,7 +342,7 @@ export default function Home() {
     const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
     const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
 
-    const totalScrimMatches = teamScrimScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+    const totalScrimMatches = teamScrimScores.length * 5;
     const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
 
     const avgScrimPts = totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00';
@@ -708,7 +706,7 @@ export default function Home() {
                       onChange={e => setScrimNameInput(e.target.value)} 
                       className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" 
                     />
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <div>
                         <span className="text-[9px] text-zinc-400 block">แต้มคิล</span>
                         <input type="number" value={scrimKillPts} onChange={e => setScrimKillPts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
@@ -716,10 +714,6 @@ export default function Home() {
                       <div>
                         <span className="text-[9px] text-zinc-400 block">แต้มอันดับ</span>
                         <input type="number" value={scrimPlacePts} onChange={e => setScrimPlacePts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-zinc-400 block">จำนวนเกม</span>
-                        <input type="number" min="1" value={scrimMatchesInput} onChange={e => setScrimMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
                     </div>
                     <button onClick={() => handleAddScrimScore(selectedTeam.id)} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนซ้อม</button>
@@ -739,7 +733,7 @@ export default function Home() {
                   selectedTeam.scrimHistory.map((s: any, index: number) => {
                     const sessionHistories = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
                     const entryCount = sessionHistories.length;
-                    const matchesCount = Number(s.matches) || 5;
+                    const matchesCount = 5;
                     const totalPts = (s.kill_points || 0) + (s.placement_points || 0);
                     const avgPerMatch = (totalPts / matchesCount).toFixed(2);
 
@@ -1022,7 +1016,7 @@ export default function Home() {
               const currentScrim = selectedTeam.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
               const maxKills = currentScrim ? Number(currentScrim.kill_points) || 0 : 0;
               const inputSumKills = Object.values(batchPlayerScores).reduce((sum: number, p: any) => sum + (Number(p.kills) || 0), 0);
-              const isOver = inputSumKills > maxKills;
+              const isOver = maxKills > 0 && inputSumKills > maxKills;
               const sessionCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
               const isFull = sessionCount >= 6;
 
@@ -1034,7 +1028,7 @@ export default function Home() {
                   </div>
 
                   <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isOver ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-sky-500/10 border-sky-500/30 text-sky-300'}`}>
-                    <span>เป้าหมายคิลห้องซ้อมนี้: <strong>{maxKills} คิล</strong></span>
+                    <span>เป้าหมายคิลห้องซ้อมนี้: <strong>{maxKills > 0 ? `${maxKills} คิล` : 'ไม่จำกัด'}</strong></span>
                     <span>กรอกแล้วรวม: <strong className={isOver ? 'text-red-400 font-black text-xs' : 'text-white'}>{inputSumKills}</strong> คิล</span>
                   </div>
                 </div>
