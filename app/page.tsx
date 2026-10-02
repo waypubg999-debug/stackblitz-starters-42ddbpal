@@ -37,7 +37,8 @@ export default function Home() {
 
   const [showBatchScoreModal, setShowBatchScoreModal] = useState(false);
   const [selectedScrimSessionId, setSelectedScrimSessionId] = useState<string>('');
-  const [batchPlayerScores, setBatchPlayerScores] = useState<{ [playerId: string]: { kills: number; assists: number; damage: number; survived: number; rescue: number; matches: number } }>({});
+  const [selectedTargetGameNo, setSelectedTargetGameNo] = useState<number>(1);
+  const [batchPlayerScores, setBatchPlayerScores] = useState<{ [playerId: string]: { kills: number; assists: number; damage: number; survived: number; rescue: number } }>({});
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [activeHistoryScrim, setActiveHistoryScrim] = useState<any | null>(null);
@@ -68,6 +69,27 @@ export default function Home() {
     setImageHasError(false);
   }, [selectedPlayer]);
 
+  useEffect(() => {
+    if (!showBatchScoreModal || !selectedScrimSessionId || !selectedTeam) return;
+
+    const sessionLogs = allScoreHistory.filter(
+      h => String(h.scrim_session_id) === String(selectedScrimSessionId) && Number(h.game_no) === Number(selectedTargetGameNo)
+    );
+
+    const initialScores: any = {};
+    selectedTeam.roster.forEach((player: any) => {
+      const existingLog = sessionLogs.find(l => String(l.player_id) === String(player.id));
+      initialScores[player.id] = {
+        kills: existingLog ? Number(existingLog.kills) || 0 : 0,
+        assists: existingLog ? Number(existingLog.assists) || 0 : 0,
+        damage: existingLog ? Number(existingLog.damage) || 0 : 0,
+        survived: existingLog ? Number(existingLog.survived) || 0 : 0,
+        rescue: existingLog ? Number(existingLog.rescue) || 0 : 0,
+      };
+    });
+    setBatchPlayerScores(initialScores);
+  }, [selectedScrimSessionId, selectedTargetGameNo, showBatchScoreModal]);
+
   async function fetchAllData() {
     try {
       const { data: tData } = await supabase.from('teams').select('*').order('name', { ascending: true });
@@ -92,9 +114,9 @@ export default function Home() {
       setIsAdmin(true);
       setShowLoginModal(false);
       setPassInput('');
-      alert('เข้าสู่ระบบแอดมินสำเร็จ!');
+      alert('เข้าสู่ระบบแอดมินสำเร็จ');
     } else {
-      alert('รหัสผ่านไม่ถูกต้อง!');
+      alert('รหัสผ่านไม่ถูกต้อง');
     }
   };
 
@@ -122,7 +144,7 @@ export default function Home() {
     const { data: pubData } = supabase.storage.from('esports-assets').getPublicUrl(fileName);
     if (pubData) {
       setterFunc(pubData.publicUrl);
-      alert('อัปโหลดรูปสำเร็จ!');
+      alert('อัปโหลดรูปสำเร็จ');
     }
   }
 
@@ -141,7 +163,7 @@ export default function Home() {
 
   async function handleDeleteTeam(teamId: string, teamName: string) {
     if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบ Team "${teamName}" ใช่หรือไม่?`)) return;
+    if (!confirm(`ต้องการลบ Team "${teamName}" ใช่หรือไม่`)) return;
     await supabase.from('teams').delete().eq('id', teamId);
     if (selectedTeam?.id === teamId) setSelectedTeam(null);
     fetchAllData();
@@ -184,7 +206,7 @@ export default function Home() {
 
   async function handleDeletePlayerCompletely(playerId: string, playerIgn: string) {
     if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบผู้เล่น "${playerIgn}" ออกจากระบบใช่หรือไม่?`)) return;
+    if (!confirm(`ต้องการลบผู้เล่น "${playerIgn}" ออกจากระบบใช่หรือไม่`)) return;
     
     const { error } = await supabase.from('players').delete().eq('id', playerId);
     if (error) {
@@ -193,17 +215,17 @@ export default function Home() {
     }
 
     await fetchAllData();
-    alert('ลบผู้เล่นออกจากระบบสำเร็จ!');
+    alert('ลบผู้เล่นออกจากระบบสำเร็จ');
   }
 
   async function handleDeleteScrimScore(scrimId: string, scrimName: string) {
     if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบประวัติห้องซ้อม "${scrimName}" นี้ใช่หรือไม่?`)) return;
+    if (!confirm(`ต้องการลบประวัติห้องซ้อม "${scrimName}" นี้ใช่หรือไม่`)) return;
 
     await supabase.from('scrim_scores').delete().eq('id', scrimId);
     await supabase.from('player_score_history').delete().eq('scrim_session_id', scrimId);
 
-    alert('ลบประวัติห้องซ้อมสำเร็จ!');
+    alert('ลบประวัติห้องซ้อมสำเร็จ');
     await fetchAllData();
 
     const { data: tData } = await supabase.from('teams').select('*');
@@ -251,11 +273,11 @@ export default function Home() {
 
   async function handleDeleteTourneyScore(tourneyId: string, tourneyName: string) {
     if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบประวัติทัวร์นาเมนต์ "${tourneyName}" นี้ใช่หรือไม่?`)) return;
+    if (!confirm(`ต้องการลบประวัติทัวร์นาเมนต์ "${tourneyName}" นี้ใช่หรือไม่`)) return;
 
     await supabase.from('tournament_scores').delete().eq('id', tourneyId);
 
-    alert('ลบประวัติทัวร์นาเมนต์สำเร็จ!');
+    alert('ลบประวัติทัวร์นาเมนต์สำเร็จ');
     await fetchAllData();
 
     const { data: tData } = await supabase.from('teams').select('*');
@@ -305,19 +327,12 @@ export default function Home() {
     if (!requireAdmin()) return;
     if (!selectedScrimSessionId) return alert('กรุณาเลือกห้องซ้อม/แมตช์ที่ต้องการอ้างอิงก่อน');
 
-    const sessionHistoryCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
-    if (sessionHistoryCount >= 6) {
-      alert('❌ ห้องซ้อมนี้ถูกกรอกคะแนนครบขีดจำกัด 6 ครั้งแล้ว ไม่สามารถกรอกเพิ่มได้อีก');
-      return;
-    }
-
     const targetScrim = team.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
     const maxScrimKills = Number(targetScrim?.kill_points) || 0;
-
     const totalInputKills = Object.values(batchPlayerScores).reduce((sum, p) => sum + (Number(p.kills) || 0), 0);
 
     if (maxScrimKills > 0 && totalInputKills > maxScrimKills) {
-      alert(`❌ คะแนนคิลรวมของผู้เล่นทุกคน (${totalInputKills}) ห้ามเกินคะแนนคิลของห้องซ้อมนี้ (${maxScrimKills} คิล)`);
+      alert(`คะแนนคิลรวมของผู้เล่นทุกคน (${totalInputKills}) ห้ามเกินคะแนนคิลของห้องซ้อมนี้ (${maxScrimKills} คิล)`);
       return;
     }
 
@@ -325,12 +340,26 @@ export default function Home() {
       for (const player of team.roster) {
         const stats = batchPlayerScores[player.id];
         if (stats) {
-          const newMatches = (Number(player.total_matches) || 0) + (Number(stats.matches) || 0);
-          const newKills = (Number(player.total_kills) || 0) + (Number(stats.kills) || 0);
-          const newAssists = (Number(player.Assists) || 0) + (Number(stats.assists) || 0);
-          const newDamage = (Number(player.Damage) || 0) + (Number(stats.damage) || 0);
-          const newSurvived = (Number(player.Survived) || 0) + (Number(stats.survived) || 0);
-          const newRescue = (Number(player.Rescue) || 0) + (Number(stats.rescue) || 0);
+          const { data: existingLog } = await supabase
+            .from('player_score_history')
+            .select('*')
+            .eq('scrim_session_id', String(selectedScrimSessionId))
+            .eq('player_id', String(player.id))
+            .eq('game_no', Number(selectedTargetGameNo))
+            .maybeSingle();
+
+          const oldKills = existingLog ? Number(existingLog.kills) || 0 : 0;
+          const oldAssists = existingLog ? Number(existingLog.assists) || 0 : 0;
+          const oldDamage = existingLog ? Number(existingLog.damage) || 0 : 0;
+          const oldSurvived = existingLog ? Number(existingLog.survived) || 0 : 0;
+          const oldRescue = existingLog ? Number(existingLog.rescue) || 0 : 0;
+
+          const newKills = (Number(player.total_kills) || 0) - oldKills + (Number(stats.kills) || 0);
+          const newAssists = (Number(player.Assists) || 0) - oldAssists + (Number(stats.assists) || 0);
+          const newDamage = (Number(player.Damage) || 0) - oldDamage + (Number(stats.damage) || 0);
+          const newSurvived = (Number(player.Survived) || 0) - oldSurvived + (Number(stats.survived) || 0);
+          const newRescue = (Number(player.Rescue) || 0) - oldRescue + (Number(stats.rescue) || 0);
+          const newMatches = (Number(player.total_matches) || 0) + (existingLog ? 0 : 1);
 
           await supabase.from('players').update({
             total_matches: newMatches,
@@ -342,22 +371,33 @@ export default function Home() {
             last_scrim_session_id: String(selectedScrimSessionId)
           }).eq('id', player.id);
 
-          await supabase.from('player_score_history').insert([{
-            scrim_session_id: String(selectedScrimSessionId),
-            team_id: team.id,
-            player_id: player.id,
-            ign: player.ign,
-            matches: Number(stats.matches) || 0,
-            kills: Number(stats.kills) || 0,
-            assists: Number(stats.assists) || 0,
-            damage: Number(stats.damage) || 0,
-            survived: Number(stats.survived) || 0,
-            rescue: Number(stats.rescue) || 0
-          }]);
+          if (existingLog) {
+            await supabase.from('player_score_history').update({
+              kills: Number(stats.kills) || 0,
+              assists: Number(stats.assists) || 0,
+              damage: Number(stats.damage) || 0,
+              survived: Number(stats.survived) || 0,
+              rescue: Number(stats.rescue) || 0,
+            }).eq('id', existingLog.id);
+          } else {
+            await supabase.from('player_score_history').insert([{
+              scrim_session_id: String(selectedScrimSessionId),
+              team_id: team.id,
+              player_id: player.id,
+              ign: player.ign,
+              matches: 1,
+              kills: Number(stats.kills) || 0,
+              assists: Number(stats.assists) || 0,
+              damage: Number(stats.damage) || 0,
+              survived: Number(stats.survived) || 0,
+              rescue: Number(stats.rescue) || 0,
+              game_no: Number(selectedTargetGameNo)
+            }]);
+          }
         }
       }
 
-      alert('บันทึกคะแนนและประวัติสะสมสำเร็จ!');
+      alert(`บันทึกคะแนน เกมที่ ${selectedTargetGameNo} สำเร็จ`);
       setShowBatchScoreModal(false);
       setBatchPlayerScores({});
       
@@ -431,7 +471,7 @@ export default function Home() {
       return;
     }
     setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0); setScrimMatchesInput(5);
-    alert('บันทึกคะแนนห้องซ้อมสำเร็จ!');
+    alert('บันทึกคะแนนห้องซ้อมสำเร็จ');
     fetchAllData();
   }
 
@@ -450,7 +490,7 @@ export default function Home() {
       return;
     }
     setTourneyNameInput(''); setTourneyKillPts(0); setTourneyPlacePts(0); setTourneyMatchesInput(5);
-    alert('บันทึกคะแนนทัวร์นาเมนต์สำเร็จ!');
+    alert('บันทึกคะแนนทัวร์นาเมนต์สำเร็จ');
     fetchAllData();
   }
 
@@ -565,14 +605,14 @@ export default function Home() {
               }}
               className="bg-emerald-500/20 hover:bg-red-500/20 border border-emerald-500/40 hover:border-red-500/40 text-emerald-400 hover:text-red-400 text-[9px] px-2.5 py-1 rounded font-bold transition cursor-pointer"
             >
-              🔓 แอดมิน (คลิกออก)
+              แอดมิน (คลิกออก)
             </button>
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}
               className="bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 text-[9px] px-2.5 py-1 rounded font-bold transition"
             >
-              🔐 เข้าสู่ระบบแอดมิน
+              เข้าสู่ระบบแอดมิน
             </button>
           )}
         </div>
@@ -604,7 +644,7 @@ export default function Home() {
         {isAdmin && (
           <div className="bg-zinc-900/80 border border-sky-500/30 p-3 rounded-xl space-y-2 mb-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold text-sky-400">🔥 Top Players (ผู้เล่นคิลสูงสุด)</h3>
+              <h3 className="text-xs font-bold text-sky-400">Top Players (ผู้เล่นคิลสูงสุด)</h3>
               <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="text-[10px] bg-sky-500 text-black font-bold px-2 py-0.5 rounded">
                 {showPlayerForm ? 'ปิดฟอร์ม' : '+ เพิ่ม Player'}
               </button>
@@ -617,7 +657,7 @@ export default function Home() {
                   <div className="flex gap-1">
                     <input type="text" placeholder="รูปผู้เล่น (URL หรืออัปโหลด)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="flex-1 bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]" />
                     <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-2 py-1 rounded text-[10px] cursor-pointer flex items-center justify-center border border-sky-500/30">
-                      📁 อัปโหลด
+                      อัปโหลด
                       <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setPlayerAvatarUrl)} className="hidden" />
                     </label>
                   </div>
@@ -663,7 +703,7 @@ export default function Home() {
         )}
 
         <div className="flex justify-between items-center">
-          <h2 className="text-xs font-bold text-zinc-300">🏆 รายชื่อทีมทั้งหมด ({teams.length} ทีม)</h2>
+          <h2 className="text-xs font-bold text-zinc-300">รายชื่อทีมทั้งหมด ({teams.length} ทีม)</h2>
           {isAdmin && teams.length < 20 && (
             <button onClick={() => setShowTeamForm(!showTeamForm)} className="text-xs bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
               {showTeamForm ? 'ปิด' : '+ เพิ่ม Team'}
@@ -681,7 +721,7 @@ export default function Home() {
               <div className="flex gap-1">
                 <input type="text" placeholder="https://... หรืออัปโหลดรูปขวา" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="flex-1 bg-black p-2 rounded text-white border border-zinc-800 text-xs" />
                 <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-3 py-2 rounded text-xs cursor-pointer flex items-center justify-center border border-sky-500/30">
-                  📁 อัปโหลด
+                  อัปโหลด
                   <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setTeamLogoUrl)} className="hidden" />
                 </label>
               </div>
@@ -693,7 +733,7 @@ export default function Home() {
 
         <input
           type="text"
-          placeholder="🔍 ค้นหาชื่อทีมหรือ TAG..."
+          placeholder="ค้นหาชื่อทีมหรือ TAG..."
           value={teamSearchQuery}
           onChange={(e) => setTeamSearchQuery(e.target.value)}
           className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
@@ -734,7 +774,7 @@ export default function Home() {
 
                   {isAdmin && (
                     <div className="shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/20 text-red-400 p-3.5 rounded-xl border border-red-500/30 hover:bg-red-500/30 shadow-lg">🗑️</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/20 text-red-400 p-3.5 rounded-xl border border-red-500/30 hover:bg-red-500/30 shadow-lg">ลบ</button>
                     </div>
                   )}
                 </div>
@@ -770,12 +810,11 @@ export default function Home() {
             {teamModalDetailTab === 'overview' && (
               <div className="space-y-3 pt-1">
                 <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-3">
-                  <p className="text-zinc-300 font-bold">📊 สรุปคะแนน (แยกประเภท, แต้มคิล, แต้มอันดับ และจำนวนเกม):</p>
+                  <p className="text-zinc-300 font-bold">สรุปคะแนน (แยกประเภท, แต้มคิล, แต้มอันดับ และจำนวนเกม):</p>
                   
                   <div className="grid grid-cols-2 gap-2 text-center">
-                    {/* สรุปห้องซ้อม */}
                     <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-900 space-y-1.5">
-                      <span className="text-[10px] text-sky-400 font-bold block">🏠 ห้องซ้อมรวม</span>
+                      <span className="text-[10px] text-sky-400 font-bold block">ห้องซ้อมรวม</span>
                       <div className="text-base font-black text-white">{selectedTeam.totalScrimPts} แต้ม</div>
                       <div className="grid grid-cols-2 gap-1 text-[9px] bg-black p-1.5 rounded border border-zinc-900">
                         <div>
@@ -794,9 +833,8 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* สรุปทัวร์นาเมนต์ */}
                     <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-900 space-y-1.5">
-                      <span className="text-[10px] text-amber-300 font-bold block">🏆 ทัวร์นาเมนต์รวม</span>
+                      <span className="text-[10px] text-amber-300 font-bold block">ทัวร์นาเมนต์รวม</span>
                       <div className="text-base font-black text-white">{selectedTeam.totalTourneyPts} แต้ม</div>
                       <div className="grid grid-cols-2 gap-1 text-[9px] bg-black p-1.5 rounded border border-zinc-900">
                         <div>
@@ -823,7 +861,7 @@ export default function Home() {
               <div className="space-y-3 pt-1">
                 {isAdmin && (
                   <div className="bg-black p-2.5 rounded-lg border border-sky-500/40 space-y-2">
-                    <p className="text-[10px] text-sky-400 font-bold">➕ เพิ่มคะแนนห้องซ้อมให้ทีมนี้</p>
+                    <p className="text-[10px] text-sky-400 font-bold">เพิ่มคะแนนห้องซ้อมให้ทีมนี้</p>
                     <input 
                       type="text" 
                       placeholder="พิมพ์ชื่อห้องซ้อม (เช่น Room วันนี้ Match 1)" 
@@ -845,12 +883,12 @@ export default function Home() {
                         <input type="number" min="1" value={scrimMatchesInput} onChange={e => setScrimMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
                     </div>
-                    <button onClick={() => handleAddScrimScore(selectedTeam.id)} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนซ้อม</button>
+                    <button onClick={() => handleAddScrimScore(selectedTeam.id)} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px]">บันทึกคะแนนซ้อม</button>
                   </div>
                 )}
 
                 <div className="flex justify-between items-center">
-                  <p className="text-sky-400 font-bold">🏠 ประวัติการลงห้องซ้อม:</p>
+                  <p className="text-sky-400 font-bold">ประวัติการลงห้องซ้อม:</p>
                   <span className="text-[11px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded font-bold border border-sky-500/30">
                     บันทึกแล้ว: {selectedTeam.scrimHistory.length} ครั้ง
                   </span>
@@ -861,7 +899,7 @@ export default function Home() {
                 ) : (
                   selectedTeam.scrimHistory.map((s: any, index: number) => {
                     const sessionHistories = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
-                    const entryCount = sessionHistories.length;
+                    const uniqueGamesCount = new Set(sessionHistories.map(h => h.game_no)).size;
                     const matchesCount = Number(s.matches) || 5;
                     const totalPts = (s.kill_points || 0) + (s.placement_points || 0);
                     const avgPerMatch = (totalPts / matchesCount).toFixed(2);
@@ -876,8 +914,7 @@ export default function Home() {
                           className="flex justify-between items-center cursor-pointer"
                         >
                           <span className="text-white font-bold flex items-center gap-1.5 text-xs">
-                            #️⃣{index + 1} 🏠 {s.scrim_name || 'ห้องซ้อม'}
-                            {entryCount > 0 && <span className="text-emerald-400" title="กรอกแล้ว">✅</span>}
+                            #{index + 1} {s.scrim_name || 'ห้องซ้อม'}
                           </span>
                           <span className="font-black text-sky-400">{totalPts} แต้ม (AVG: {avgPerMatch})</span>
                         </div>
@@ -887,14 +924,14 @@ export default function Home() {
                           </span>
                           <div className="flex items-center gap-2">
                             <span onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }} className="cursor-pointer">
-                              กรอกผู้เล่น: <strong className={entryCount >= 6 ? 'text-red-400' : 'text-emerald-400'}>{entryCount}/6 ครั้ง</strong>
+                              กรอกผู้เล่น: <strong className={uniqueGamesCount >= 6 ? 'text-red-400' : 'text-emerald-400'}>{uniqueGamesCount}/6 ครั้ง</strong>
                             </span>
                             {isAdmin && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleDeleteScrimScore(s.id, s.scrim_name); }} 
                                 className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-0.5 rounded border border-red-500/30 font-bold"
                               >
-                                🗑️ ลบ
+                                ลบ
                               </button>
                             )}
                           </div>
@@ -910,7 +947,7 @@ export default function Home() {
               <div className="space-y-3 pt-1">
                 {isAdmin && (
                   <div className="bg-black p-2.5 rounded-lg border border-amber-500/40 space-y-2">
-                    <p className="text-[10px] text-amber-300 font-bold">➕ เพิ่มคะแนนทัวร์นาเมนต์ให้ทีมนี้</p>
+                    <p className="text-[10px] text-amber-300 font-bold">เพิ่มคะแนนทัวร์นาเมนต์ให้ทีมนี้</p>
                     <input 
                       type="text" 
                       placeholder="พิมพ์ชื่อทัวร์นาเมนต์ (เช่น Pro League Final)" 
@@ -932,12 +969,12 @@ export default function Home() {
                         <input type="number" min="1" value={tourneyMatchesInput} onChange={e => setTourneyMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
                     </div>
-                    <button onClick={() => handleAddTourneyScore(selectedTeam.id)} className="w-full bg-amber-400 hover:bg-amber-300 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนทัวร์</button>
+                    <button onClick={() => handleAddTourneyScore(selectedTeam.id)} className="w-full bg-amber-400 hover:bg-amber-300 text-black font-bold py-1 rounded text-[10px]">บันทึกคะแนนทัวร์</button>
                   </div>
                 )}
 
                 <div className="flex justify-between items-center">
-                  <p className="text-amber-300 font-bold">🏆 ประวัติการลงทัวร์นาเมนต์:</p>
+                  <p className="text-amber-300 font-bold">ประวัติการลงทัวร์นาเมนต์:</p>
                   <span className="text-[11px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-500/30">
                     บันทึกแล้ว: {selectedTeam.tourneyHistory.length} ครั้ง
                   </span>
@@ -954,7 +991,7 @@ export default function Home() {
                     return (
                       <div key={t.id} className="bg-black p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-[10px]">
                         <div>
-                          <span className="text-zinc-300 block font-bold">#️⃣{index + 1} 🏆 {t.tournament_name || 'ทัวร์นาเมนต์'}</span>
+                          <span className="text-zinc-300 block font-bold">#{index + 1} {t.tournament_name || 'ทัวร์นาเมนต์'}</span>
                           <span className="text-[9px] text-zinc-400">คิล: <strong className="text-amber-300">{t.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{t.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong></span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -967,7 +1004,7 @@ export default function Home() {
                               onClick={() => handleDeleteTourneyScore(t.id, t.tournament_name)} 
                               className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-1 rounded border border-red-500/30 font-bold"
                             >
-                              🗑️ ลบ
+                              ลบ
                             </button>
                           )}
                         </div>
@@ -981,15 +1018,15 @@ export default function Home() {
             {teamModalDetailTab === 'roster' && (
               <div className="space-y-2 pt-1">
                 <div className="flex justify-between items-center">
-                  <p className="text-zinc-300 font-bold">👥 Player ใน Team ({selectedTeam.roster.length}):</p>
+                  <p className="text-zinc-300 font-bold">Player ใน Team ({selectedTeam.roster.length}):</p>
                   {isAdmin && selectedTeam.scrimHistory.length > 0 && selectedTeam.roster.length > 0 && (
                     <button 
                       onClick={() => {
                         setSelectedScrimSessionId(selectedTeam.scrimHistory[selectedTeam.scrimHistory.length - 1]?.id || '');
+                        setSelectedTargetGameNo(1);
                         const initialScores: any = {};
                         selectedTeam.roster.forEach((p: any) => {
                           initialScores[p.id] = {
-                            matches: 0,
                             kills: 0,
                             assists: 0,
                             damage: 0,
@@ -1002,21 +1039,21 @@ export default function Home() {
                       }} 
                       className="bg-sky-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow"
                     >
-                      ✏️ กรอกคะแนนผู้เล่นทั้งทีม
+                      กรอกคะแนนผู้เล่นทั้งทีม
                     </button>
                   )}
                 </div>
 
                 {isAdmin && (
                   <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5 mb-2">
-                    <label className="text-[9px] text-sky-400 font-bold block">✨ เพิ่ม Player ใหม่เข้า Team นี้</label>
+                    <label className="text-[9px] text-sky-400 font-bold block">เพิ่ม Player ใหม่เข้า Team นี้</label>
                     <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" />
                     
                     <div className="space-y-1">
                       <div className="flex gap-1">
                         <input type="text" placeholder="รูปผู้เล่น (URL หรืออัปโหลด)" value={newTeamPlayerAvatar} onChange={e => setNewTeamPlayerAvatar(e.target.value)} className="flex-1 bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" />
                         <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-2 py-1 rounded text-[10px] cursor-pointer flex items-center justify-center border border-sky-500/30">
-                          📁 อัปโหลด
+                          อัปโหลด
                           <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setNewTeamPlayerAvatar)} className="hidden" />
                         </label>
                       </div>
@@ -1030,13 +1067,13 @@ export default function Home() {
                         <option value="">-- รอง --</option><option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Co-iGL">Co-iGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
                       </select>
                     </div>
-                    <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ บันทึกผู้เล่นเข้าทีม</button>
+                    <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">+ บันทึกผู้เล่นเข้าทีม</button>
                   </div>
                 )}
 
                 {selectedTeam.scrimHistory.length === 0 && isAdmin && (
                   <p className="text-[10px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/30 text-center">
-                    ⚠️ ต้องบันทึกคะแนนห้องซ้อมอย่างน้อย 1 ครั้งก่อน จึงจะสามารถกรอกคะแนนผู้เล่นได้
+                    ต้องบันทึกคะแนนห้องซ้อมอย่างน้อย 1 ครั้งก่อน จึงจะสามารถกรอกคะแนนผู้เล่นได้
                   </p>
                 )}
 
@@ -1044,7 +1081,6 @@ export default function Home() {
                   <p className="text-zinc-500 italic text-center py-2">ยังไม่มี Player ใน Team นี้</p>
                 ) : (
                   selectedTeam.roster.map((p: any) => {
-                    const isGraded = Boolean(p.last_scrim_session_id);
                     return (
                       <div 
                         key={p.id} 
@@ -1056,7 +1092,6 @@ export default function Home() {
                           <div>
                             <span className="text-white font-black text-sm flex items-center gap-1">
                               {p.ign}
-                              {isGraded && <span className="text-emerald-400 text-[10px]" title="กรอกคะแนนแล้ว">✅</span>}
                             </span>
                           </div>
                         </div>
@@ -1087,7 +1122,7 @@ export default function Home() {
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div>
-                <h3 className="font-bold text-sky-400 text-sm">📊 ผลงานผู้เล่นรอบ: {activeHistoryScrim.scrim_name}</h3>
+                <h3 className="font-bold text-sky-400 text-sm">ผลงานผู้เล่นรอบ: {activeHistoryScrim.scrim_name}</h3>
                 <p className="text-[10px] text-zinc-400">แต้มห้องซ้อมนี้: คิล {activeHistoryScrim.kill_points} | อันดับ {activeHistoryScrim.placement_points}</p>
               </div>
               <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
@@ -1099,20 +1134,19 @@ export default function Home() {
                 return <p className="text-zinc-500 italic text-center py-6">ยังไม่มีการบันทึกสถิติผู้เล่นในรอบนี้</p>;
               }
 
-              const groupedLogs: { [time: string]: any[] } = {};
+              const groupedByGame: { [gameNo: number]: any[] } = {};
               logs.forEach(l => {
-                const timeKey = new Date(l.created_at).toLocaleString('th-TH');
-                if (!groupedLogs[timeKey]) groupedLogs[timeKey] = [];
-                groupedLogs[timeKey].push(l);
+                const gNo = Number(l.game_no) || 1;
+                if (!groupedByGame[gNo]) groupedByGame[gNo] = [];
+                groupedByGame[gNo].push(l);
               });
 
               return (
                 <div className="space-y-4">
-                  {Object.entries(groupedLogs).map(([timestamp, playerLogs], idx) => (
-                    <div key={timestamp} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                  {Object.entries(groupedByGame).map(([gameNo, playerLogs]) => (
+                    <div key={gameNo} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
                       <div className="flex justify-between items-center border-b border-zinc-900 pb-1 text-[10px]">
-                        <span className="text-sky-400 font-bold">บันทึกครั้งที่ #{idx + 1}</span>
-                        <span className="text-zinc-400">{timestamp}</span>
+                        <span className="text-sky-400 font-bold">เกมที่ {gameNo}</span>
                       </div>
                       <div className="space-y-1.5 pt-1">
                         {playerLogs.map((pl: any) => (
@@ -1121,7 +1155,6 @@ export default function Home() {
                               <strong className="text-white text-xs">{pl.ign}</strong>
                             </div>
                             <div className="text-right space-x-2">
-                              <span>เกม: <strong className="text-white">{pl.matches}</strong></span>
                               <span>คิล: <strong className="text-sky-400">{pl.kills}</strong></span>
                               <span>แอส: <strong className="text-white">{pl.assists}</strong></span>
                               <span>ดาเมจ: <strong className="text-white">{pl.damage}</strong></span>
@@ -1145,26 +1178,43 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <h3 className="font-bold text-sky-400 text-sm">📝 กรอกคะแนนผู้เล่นทั้งทีม: [{selectedTeam.tag}]</h3>
+              <h3 className="font-bold text-sky-400 text-sm">กรอกคะแนนผู้เล่นทั้งทีม: [{selectedTeam.tag}]</h3>
               <button onClick={() => setShowBatchScoreModal(false)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] text-zinc-300 font-bold block">🏠 เลือกห้องซ้อม / แมตช์ที่ต้องการอ้างอิง:</label>
+            <div className="space-y-2">
+              <label className="text-[10px] text-zinc-300 font-bold block">เลือกห้องซ้อม / แมตช์ที่ต้องการอ้างอิง:</label>
               <select 
                 value={selectedScrimSessionId} 
                 onChange={(e) => setSelectedScrimSessionId(e.target.value)} 
                 className="w-full bg-black border border-zinc-700 p-2 rounded-xl text-xs text-white"
               >
                 {selectedTeam.scrimHistory.map((s: any, idx: number) => {
-                  const count = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id)).length;
+                  const sessionLogs = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
+                  const uniqueCount = new Set(sessionLogs.map(h => h.game_no)).size;
                   return (
                     <option key={s.id} value={s.id}>
-                      #{idx + 1} - {s.scrim_name} (กรอกแล้ว {count}/6 ครั้ง)
+                      #{idx + 1} - {s.scrim_name} (กรอกแล้ว {uniqueCount}/6 ครั้ง)
                     </option>
                   );
                 })}
               </select>
+
+              <div className="pt-1">
+                <label className="text-[10px] text-sky-400 font-bold block">เลือกเกมที่กำลังจะกรอกคะแนน:</label>
+                <select 
+                  value={selectedTargetGameNo} 
+                  onChange={(e) => setSelectedTargetGameNo(Number(e.target.value))} 
+                  className="w-full bg-black border border-sky-500/50 p-2 rounded-xl text-xs text-sky-300 font-bold"
+                >
+                  <option value={1}>เกมที่ 1</option>
+                  <option value={2}>เกมที่ 2</option>
+                  <option value={3}>เกมที่ 3</option>
+                  <option value={4}>เกมที่ 4</option>
+                  <option value={5}>เกมที่ 5</option>
+                  <option value={6}>เกมที่ 6</option>
+                </select>
+              </div>
             </div>
 
             {(() => {
@@ -1172,16 +1222,9 @@ export default function Home() {
               const maxKills = currentScrim ? Number(currentScrim.kill_points) || 0 : 0;
               const inputSumKills = Object.values(batchPlayerScores).reduce((sum: number, p: any) => sum + (Number(p.kills) || 0), 0);
               const isOver = maxKills > 0 && inputSumKills > maxKills;
-              const sessionCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
-              const isFull = sessionCount >= 6;
 
               return (
                 <div className="space-y-2">
-                  <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isFull ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'}`}>
-                    <span>สถานะการกรอกห้องนี้: <strong>{sessionCount}/6 ครั้ง</strong></span>
-                    <span>{isFull ? '⚠️ กรอกครบ 6 ครั้งแล้ว (ล็อก)' : '✅ สามารถกรอกเพิ่มได้'}</span>
-                  </div>
-
                   <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isOver ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-sky-500/10 border-sky-500/30 text-sky-300'}`}>
                     <span>เป้าหมายคิลห้องซ้อมนี้: <strong>{maxKills > 0 ? `${maxKills} คิล` : 'ไม่จำกัด'}</strong></span>
                     <span>กรอกแล้วรวม: <strong className={isOver ? 'text-red-400 font-black text-xs' : 'text-white'}>{inputSumKills}</strong> คิล</span>
@@ -1192,7 +1235,7 @@ export default function Home() {
 
             <div className="space-y-3 pt-1">
               {[...selectedTeam.roster].sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' })).map((player: any) => {
-                const pScore = batchPlayerScores[player.id] || { matches: 0, kills: 0, assists: 0, damage: 0, survived: 0, rescue: 0 };
+                const pScore = batchPlayerScores[player.id] || { kills: 0, assists: 0, damage: 0, survived: 0, rescue: 0 };
                 return (
                   <div key={player.id} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
                     <div className="flex items-center gap-2 border-b border-zinc-900 pb-1.5">
@@ -1202,15 +1245,6 @@ export default function Home() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                      <div>
-                        <span className="text-zinc-400 block text-[9px]">เกม</span>
-                        <input 
-                          type="number" 
-                          value={pScore.matches} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, matches: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
-                        />
-                      </div>
                       <div>
                         <span className="text-zinc-400 block text-[9px]">คิล (Kills)</span>
                         <input 
@@ -1247,7 +1281,7 @@ export default function Home() {
                           className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
                         />
                       </div>
-                      <div>
+                      <div className="col-span-2">
                         <span className="text-zinc-400 block text-[9px]">ช่วยเพื่อน</span>
                         <input 
                           type="number" 
@@ -1262,20 +1296,12 @@ export default function Home() {
               })}
             </div>
 
-            {(() => {
-              const sessionCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
-              const isFull = sessionCount >= 6;
-
-              return (
-                <button 
-                  onClick={() => handleSaveBatchPlayerScores(selectedTeam)} 
-                  disabled={isFull}
-                  className={`w-full font-bold py-2 rounded-xl text-xs mt-2 transition shadow-lg ${isFull ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-sky-500 hover:bg-sky-400 text-black'}`}
-                >
-                  {isFull ? '❌ กรอกครบ 6 ครั้งแล้ว (ไม่สามารถบันทึกเพิ่มได้)' : '💾 บันทึกคะแนนผู้เล่นทั้งทีม'}
-                </button>
-              );
-            })()}
+            <button 
+              onClick={() => handleSaveBatchPlayerScores(selectedTeam)} 
+              className="w-full font-bold py-2 rounded-xl text-xs mt-2 transition shadow-lg bg-sky-500 hover:bg-sky-400 text-black"
+            >
+              บันทึกคะแนนผู้เล่นทั้งทีม
+            </button>
           </div>
         </div>
       )}
@@ -1297,14 +1323,14 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-2 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-              <button onClick={() => setPlayerModalTab('scrims')} className={`py-1.5 font-bold rounded-lg transition text-[11px] ${playerModalTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 ห้องซ้อม</button>
-              <button onClick={() => setPlayerModalTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerModalTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏆 ห้องแข่ง</button>
+              <button onClick={() => setPlayerModalTab('scrims')} className={`py-1.5 font-bold rounded-lg transition text-[11px] ${playerModalTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>ห้องซ้อม</button>
+              <button onClick={() => setPlayerModalTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerModalTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>ห้องแข่ง</button>
             </div>
 
             {playerModalTab === 'scrims' ? (
               <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-sky-400 font-bold">🏠 พลังแฝงห้องซ้อม (Scrims Radar)</span>
+                  <span className="text-sky-400 font-bold">พลังแฝงห้องซ้อม (Scrims Radar)</span>
                   <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.total_matches || 0} เกม</strong></span>
                 </div>
 
@@ -1318,7 +1344,7 @@ export default function Home() {
                 {renderRadarChart(selectedPlayer.total_matches || 0, selectedPlayer.total_kills || 0, selectedPlayer.Assists || 0, selectedPlayer.Damage || 0, selectedPlayer.Survived || 0, selectedPlayer.Rescue || 0)}
 
                 <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 space-y-2">
-                  <span className="text-[10px] text-sky-400 font-bold block border-b border-zinc-900 pb-1">📋 สถิติรวมห้องซ้อมทั้งหมด</span>
+                  <span className="text-[10px] text-sky-400 font-bold block border-b border-zinc-900 pb-1">สถิติรวมห้องซ้อมทั้งหมด</span>
                   <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
                     <div className="bg-black p-1.5 rounded border border-zinc-900">
                       <span className="text-zinc-400 block text-[9px]">คิลรวม</span>
@@ -1350,7 +1376,7 @@ export default function Home() {
             ) : (
               <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-sky-300 font-bold">🏆 พลังแฝงห้องแข่ง (Tournament Radar)</span>
+                  <span className="text-sky-300 font-bold">พลังแฝงห้องแข่ง (Tournament Radar)</span>
                   <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.tourney_matches || 0} เกม</strong></span>
                 </div>
 
@@ -1364,7 +1390,7 @@ export default function Home() {
                 {renderRadarChart(selectedPlayer.tourney_matches || 0, selectedPlayer.tourney_kills || 0, selectedPlayer.tourney_assists || 0, selectedPlayer.tourney_damage || 0, selectedPlayer.tourney_survived || 0, selectedPlayer.tourney_rescue || 0)}
 
                 <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 space-y-2">
-                  <span className="text-[10px] text-amber-300 font-bold block border-b border-zinc-900 pb-1">📋 สถิติรวมห้องแข่งทั้งหมด</span>
+                  <span className="text-[10px] text-amber-300 font-bold block border-b border-zinc-900 pb-1">สถิติรวมห้องแข่งทั้งหมด</span>
                   <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
                     <div className="bg-black p-1.5 rounded border border-zinc-900">
                       <span className="text-zinc-400 block text-[9px]">คิลรวม</span>
