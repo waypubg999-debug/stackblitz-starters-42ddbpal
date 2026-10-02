@@ -19,8 +19,8 @@ export default function Home() {
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [showPlayerForm, setShowPlayerForm] = useState(false);
 
-  const [teamName, setTeamName] = useState('');
   const [teamTag, setTeamTag] = useState('');
+  const [teamName, setTeamName] = useState('');
   const [teamLogoUrl, setTeamLogoUrl] = useState('');
 
   const [ign, setIgn] = useState('');
@@ -501,7 +501,7 @@ export default function Home() {
                 </div>
                 <div className="grid grid-cols-2 gap-1">
                   <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
-                    <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                    <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Co-iGL">Co-iGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
                   </select>
                   <select value={playerTeamId} onChange={e => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
                     <option value="">-- Free Agent (LFT) --</option>
@@ -854,7 +854,7 @@ export default function Home() {
                       }} 
                       className="bg-sky-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow"
                     >
-                      ✏️️ กรอกคะแนนผู้เล่นทั้งทีม
+                      ✏️ กรอกคะแนนผู้เล่นทั้งทีม
                     </button>
                   )}
                 </div>
@@ -876,10 +876,10 @@ export default function Home() {
 
                     <div className="grid grid-cols-2 gap-1">
                       <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-[10px]">
-                        <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                        <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Co-iGL">Co-iGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
                       </select>
                       <select value={newTeamPlayerSubRole} onChange={e => setNewTeamPlayerSubRole(e.target.value)} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-[10px]">
-                        <option value="">-- รอง --</option><option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                        <option value="">-- รอง --</option><option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Co-iGL">Co-iGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
                       </select>
                     </div>
                     <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ บันทึกผู้เล่นเข้าทีม</button>
