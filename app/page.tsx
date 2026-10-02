@@ -594,27 +594,26 @@ export default function Home() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/20 pointer-events-none" />
 
-                <div className="relative z-10 flex justify-between items-center py-2">
-                  <div className="flex items-center gap-6">
+                <div className="relative z-10 flex items-center justify-between py-2 gap-4">
+                  <div className="flex items-center gap-6 min-w-0 flex-1">
                     {t.logo_url ? (
                       <img src={t.logo_url} alt={t.name} onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `[${t.tag}] ${t.name}` }); }} className="w-24 h-24 object-contain rounded-2xl bg-zinc-950/80 p-2 border-2 border-zinc-700/80 shrink-0 group-hover:scale-110 transition cursor-pointer shadow-2xl" />
                     ) : (
                       <div className="w-24 h-24 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-center text-xs text-zinc-500 shrink-0">ไม่มีโลโก้</div>
                     )}
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-black bg-sky-500/30 text-sky-300 px-3 py-1 rounded-xl border border-sky-500/50 shadow">[{t.tag}]</span>
+                        <span className="text-xs font-black bg-sky-500/30 text-sky-300 px-3 py-1 rounded-xl border border-sky-500/50 shadow inline-block">[{t.tag}]</span>
                       </div>
-                      <h3 className="font-black text-2xl text-white group-hover:text-sky-400 transition drop-shadow-xl">{t.name}</h3>
+                      <h3 className="font-black text-2xl text-white group-hover:text-sky-400 transition drop-shadow-xl truncate">{t.name}</h3>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-zinc-100 group-hover:text-sky-400 font-extrabold transition bg-zinc-900/90 px-3.5 py-2.5 rounded-xl border border-zinc-700 shadow-lg">ดูข้อมูลทีม ➔</span>
-                    {isAdmin && (
+                  {isAdmin && (
+                    <div className="shrink-0">
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/20 text-red-400 p-3.5 rounded-xl border border-red-500/30 hover:bg-red-500/30 shadow-lg">🗑️</button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
