@@ -45,6 +45,7 @@ export default function Home() {
   const [scrimNameInput, setScrimNameInput] = useState('');
   const [scrimKillPts, setScrimKillPts] = useState(0);
   const [scrimPlacePts, setScrimPlacePts] = useState(0);
+  const [scrimMatchesInput, setScrimMatchesInput] = useState(5);
 
   const [tourneyNameInput, setTourneyNameInput] = useState('');
   const [tourneyKillPts, setTourneyKillPts] = useState(0);
@@ -192,30 +193,45 @@ export default function Home() {
     }
 
     await fetchAllData();
+    alert('ลบผู้เล่นออกจากระบบสำเร็จ!');
+  }
 
-    const { data: updatedTeams } = await supabase.from('teams').select('*').order('name', { ascending: true });
-    const { data: updatedPlayers } = await supabase.from('players').select('*');
-    
-    if (updatedTeams && updatedPlayers && selectedTeam) {
-      const refreshedTeam = updatedTeams.find((t: any) => String(t.id) === String(selectedTeam.id));
-      if (refreshedTeam) {
-        const teamTourneyScores = allScores.filter(s => String(s.team_id) === String(refreshedTeam.id));
-        const teamScrimScores = allScrimScores.filter(s => String(s.team_id) === String(refreshedTeam.id));
-        const sortedRoster = updatedPlayers
-          .filter((p: any) => String(p.team_id) === String(refreshedTeam.id))
+  async function handleDeleteScrimScore(scrimId: string, scrimName: string) {
+    if (!requireAdmin()) return;
+    if (!confirm(`ต้องการลบประวัติห้องซ้อม "${scrimName}" นี้ใช่หรือไม่?`)) return;
+
+    await supabase.from('scrim_scores').delete().eq('id', scrimId);
+    await supabase.from('player_score_history').delete().eq('scrim_session_id', scrimId);
+
+    alert('ลบประวัติห้องซ้อมสำเร็จ!');
+    await fetchAllData();
+
+    // อัปเดต selectedTeam ให้ข้อมูลรีเฟรชทันที
+    const { data: tData } = await supabase.from('teams').select('*');
+    const { data: scrimData } = await supabase.from('scrim_scores').select('*');
+    const { data: scoreData } = await supabase.from('tournament_scores').select('*');
+    const { data: pData } = await supabase.from('players').select('*');
+
+    if (selectedTeam && tData && pData) {
+      const refreshed = tData.find((t: any) => String(t.id) === String(selectedTeam.id));
+      if (refreshed) {
+        const teamScrimScores = (scrimData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
+        const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
+        const sortedRoster = pData
+          .filter((p: any) => String(p.team_id) === String(refreshed.id))
           .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
 
-        const totalScrimPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
-        const totalTourneyPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
-        const totalScrimKillPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
-        const totalScrimPlacePts = teamScrimScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
-        const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
-        const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
-        const totalScrimMatches = teamScrimScores.length * 5;
-        const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+        const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalScrimKillPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+        const totalScrimPlacePts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+        const totalTourneyKillPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+        const totalTourneyPlacePts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+        const totalScrimMatches = teamScrimScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
+        const totalTourneyMatches = teamTourneyScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
 
         setSelectedTeam({
-          ...refreshedTeam,
+          ...refreshed,
           totalTourneyPts,
           totalScrimPts,
           totalScrimKillPts,
@@ -232,7 +248,58 @@ export default function Home() {
         });
       }
     }
-    alert('ลบผู้เล่นออกจากระบบสำเร็จ!');
+  }
+
+  async function handleDeleteTourneyScore(tourneyId: string, tourneyName: string) {
+    if (!requireAdmin()) return;
+    if (!confirm(`ต้องการลบประวัติทัวร์นาเมนต์ "${tourneyName}" นี้ใช่หรือไม่?`)) return;
+
+    await supabase.from('tournament_scores').delete().eq('id', tourneyId);
+
+    alert('ลบประวัติทัวร์นาเมนต์สำเร็จ!');
+    await fetchAllData();
+
+    const { data: tData } = await supabase.from('teams').select('*');
+    const { data: scrimData } = await supabase.from('scrim_scores').select('*');
+    const { data: scoreData } = await supabase.from('tournament_scores').select('*');
+    const { data: pData } = await supabase.from('players').select('*');
+
+    if (selectedTeam && tData && pData) {
+      const refreshed = tData.find((t: any) => String(t.id) === String(selectedTeam.id));
+      if (refreshed) {
+        const teamScrimScores = (scrimData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
+        const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
+        const sortedRoster = pData
+          .filter((p: any) => String(p.team_id) === String(refreshed.id))
+          .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+
+        const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalScrimKillPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+        const totalScrimPlacePts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+        const totalTourneyKillPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0), 0);
+        const totalTourneyPlacePts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.placement_points || 0), 0);
+        const totalScrimMatches = teamScrimScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
+        const totalTourneyMatches = teamTourneyScores.reduce((sum: number, s: any) => sum + (Number(s.matches) || 5), 0);
+
+        setSelectedTeam({
+          ...refreshed,
+          totalTourneyPts,
+          totalScrimPts,
+          totalScrimKillPts,
+          totalScrimPlacePts,
+          totalTourneyKillPts,
+          totalTourneyPlacePts,
+          totalScrimMatches,
+          totalTourneyMatches,
+          avgScrimPts: totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00',
+          avgTourneyPts: totalTourneyMatches > 0 ? (totalTourneyPts / totalTourneyMatches).toFixed(2) : '0.00',
+          roster: sortedRoster,
+          scrimHistory: teamScrimScores,
+          tourneyHistory: teamTourneyScores
+        });
+      }
+    }
   }
 
   async function handleSaveBatchPlayerScores(team: any) {
@@ -307,13 +374,14 @@ export default function Home() {
       scrim_name: scrimNameInput.trim(),
       team_id: teamId,
       kill_points: Number(scrimKillPts) || 0,
-      placement_points: Number(scrimPlacePts) || 0
+      placement_points: Number(scrimPlacePts) || 0,
+      matches: Number(scrimMatchesInput) || 5
     }]);
     if (error) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
       return;
     }
-    setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0);
+    setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0); setScrimMatchesInput(5);
     alert('บันทึกคะแนนห้องซ้อมสำเร็จ!');
     fetchAllData();
   }
@@ -350,7 +418,7 @@ export default function Home() {
     const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
     const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
 
-    const totalScrimMatches = teamScrimScores.length * 5;
+    const totalScrimMatches = teamScrimScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
     const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
 
     const avgScrimPts = totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00';
@@ -714,7 +782,7 @@ export default function Home() {
                       onChange={e => setScrimNameInput(e.target.value)} 
                       className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" 
                     />
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <div>
                         <span className="text-[9px] text-zinc-400 block">แต้มคิล</span>
                         <input type="number" value={scrimKillPts} onChange={e => setScrimKillPts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
@@ -722,6 +790,10 @@ export default function Home() {
                       <div>
                         <span className="text-[9px] text-zinc-400 block">แต้มอันดับ</span>
                         <input type="number" value={scrimPlacePts} onChange={e => setScrimPlacePts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">จำนวนเกม</span>
+                        <input type="number" min="1" value={scrimMatchesInput} onChange={e => setScrimMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
                     </div>
                     <button onClick={() => handleAddScrimScore(selectedTeam.id)} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนซ้อม</button>
@@ -741,17 +813,19 @@ export default function Home() {
                   selectedTeam.scrimHistory.map((s: any, index: number) => {
                     const sessionHistories = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
                     const entryCount = sessionHistories.length;
-                    const matchesCount = 5;
+                    const matchesCount = Number(s.matches) || 5;
                     const totalPts = (s.kill_points || 0) + (s.placement_points || 0);
                     const avgPerMatch = (totalPts / matchesCount).toFixed(2);
 
                     return (
                       <div 
                         key={s.id} 
-                        onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }}
-                        className="bg-black p-3 rounded-xl border border-zinc-800 hover:border-sky-500 cursor-pointer space-y-2 text-[10px] transition shadow"
+                        className="bg-black p-3 rounded-xl border border-zinc-800 hover:border-sky-500 space-y-2 text-[10px] transition shadow"
                       >
-                        <div className="flex justify-between items-center">
+                        <div 
+                          onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }}
+                          className="flex justify-between items-center cursor-pointer"
+                        >
                           <span className="text-white font-bold flex items-center gap-1.5 text-xs">
                             #️⃣{index + 1} 🏠 {s.scrim_name || 'ห้องซ้อม'}
                             {entryCount > 0 && <span className="text-emerald-400" title="กรอกแล้ว">✅</span>}
@@ -759,8 +833,22 @@ export default function Home() {
                           <span className="font-black text-sky-400">{totalPts} แต้ม (AVG: {avgPerMatch})</span>
                         </div>
                         <div className="flex justify-between items-center pt-1 border-t border-zinc-900 text-[9px] text-zinc-400">
-                          <span>คิล: <strong className="text-sky-400">{s.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{s.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong></span>
-                          <span>กรอกผู้เล่น: <strong className={entryCount >= 6 ? 'text-red-400' : 'text-emerald-400'}>{entryCount}/6 ครั้ง</strong></span>
+                          <span onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }} className="cursor-pointer">
+                            คิล: <strong className="text-sky-400">{s.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{s.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }} className="cursor-pointer">
+                              กรอกผู้เล่น: <strong className={entryCount >= 6 ? 'text-red-400' : 'text-emerald-400'}>{entryCount}/6 ครั้ง</strong>
+                            </span>
+                            {isAdmin && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteScrimScore(s.id, s.scrim_name); }} 
+                                className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-0.5 rounded border border-red-500/30 font-bold"
+                              >
+                                🗑️ ลบ
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -820,9 +908,19 @@ export default function Home() {
                           <span className="text-zinc-300 block font-bold">#️⃣{index + 1} 🏆 {t.tournament_name || 'ทัวร์นาเมนต์'}</span>
                           <span className="text-[9px] text-zinc-400">คิล: <strong className="text-amber-300">{t.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{t.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong></span>
                         </div>
-                        <div className="text-right">
-                          <span className="font-black text-amber-300 text-xs block">{totalPts} แต้ม</span>
-                          <span className="text-[9px] text-zinc-400">AVG: <strong className="text-amber-400">{avgPerMatch}</strong></span>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="font-black text-amber-300 text-xs block">{totalPts} แต้ม</span>
+                            <span className="text-[9px] text-zinc-400">AVG: <strong className="text-amber-400">{avgPerMatch}</strong></span>
+                          </div>
+                          {isAdmin && (
+                            <button 
+                              onClick={() => handleDeleteTourneyScore(t.id, t.tournament_name)} 
+                              className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-1 rounded border border-red-500/30 font-bold"
+                            >
+                              🗑️ ลบ
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
