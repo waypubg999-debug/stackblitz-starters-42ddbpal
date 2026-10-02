@@ -286,7 +286,15 @@ export default function Home() {
 
       alert('บันทึกคะแนนและประวัติสำเร็จ!');
       setShowBatchScoreModal(false);
-      fetchAllData();
+      await fetchAllData();
+
+      const { data: freshPlayers } = await supabase.from('players').select('*');
+      if (freshPlayers && selectedPlayer) {
+        const updatedCurrentPlayer = freshPlayers.find((p: any) => String(p.id) === String(selectedPlayer.id));
+        if (updatedCurrentPlayer) {
+          setSelectedPlayer(updatedCurrentPlayer);
+        }
+      }
     } catch (err: any) {
       alert('เกิดข้อผิดพลาด: ' + err.message);
     }
