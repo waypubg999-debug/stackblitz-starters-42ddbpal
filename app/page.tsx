@@ -3,96 +3,55 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'matches' | 'vault'>('teams');
-  const [teamSubTab, setTeamSubTab] = useState<'scrims' | 'tournaments'>('scrims');
-  const [matchSubTab, setMatchSubTab] = useState<'scrims' | 'tournaments'>('scrims');
-  const [playerStatTab, setPlayerStatTab] = useState<'scrims' | 'tournaments'>('scrims');
-
-  // --- SEARCH & FILTER STATES ---
   const [teamSearchQuery, setTeamSearchQuery] = useState<string>('');
-  const [playerSearchQuery, setPlayerSearchQuery] = useState<string>('');
-  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
 
-  // --- TIME FILTER STATE (เฉพาะฝั่งทีม) ---
-  const [timeFilter, setTimeFilter] = useState<'all' | '1d' | '7d' | '30d'>('all');
-
-  // --- CORE STATES ---
   const [teams, setTeams] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
-  const [tournaments, setTournaments] = useState<any[]>([]);
-  const [scrimTournaments, setScrimTournaments] = useState<any[]>([]);
   
-  const [scores, setScores] = useState<any[]>([]);
   const [allScores, setAllScores] = useState<any[]>([]);
-  const [scrimScores, setScrimScores] = useState<any[]>([]);
   const [allScrimScores, setAllScrimScores] = useState<any[]>([]);
+  const [allScoreHistory, setAllScoreHistory] = useState<any[]>([]);
 
-  const [selectedTournament, setSelectedTournament] = useState<string>('');
-  const [selectedScrimTournament, setSelectedScrimTournament] = useState<string>('');
-
-  // --- STORAGE VAULT STATES ---
-  const [vaultFiles, setVaultFiles] = useState<any[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
-
-  // --- ADMIN SECURITY STATES ---
   const [isAdmin, setIsAdmin] = useState(false);
   const [passInput, setPassInput] = useState('');
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // --- MODALS & FORMS ---
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [showPlayerForm, setShowPlayerForm] = useState(false);
-  const [showTourneyForm, setShowTourneyForm] = useState(false);
-  const [showScrimForm, setShowScrimForm] = useState(false);
-
-  const [selectedScrimDetail, setSelectedScrimDetail] = useState<any | null>(null);
-  const [selectedTourneyDetail, setSelectedTourneyDetail] = useState<any | null>(null);
 
   const [teamName, setTeamName] = useState('');
   const [teamTag, setTeamTag] = useState('');
   const [teamLogoUrl, setTeamLogoUrl] = useState('');
 
-  // Player Form States
   const [ign, setIgn] = useState('');
   const [role, setRole] = useState('ATK 1');
   const [subRole, setSubRole] = useState('');
   const [playerTeamId, setPlayerTeamId] = useState('');
   const [playerAvatarUrl, setPlayerAvatarUrl] = useState('');
 
-  // Edit Player States
-  const [editingPlayer, setEditingPlayer] = useState<any | null>(null);
-  const [editIgn, setEditIgn] = useState('');
-  const [editRole, setEditRole] = useState('ATK 1');
-  const [editSubRole, setEditSubRole] = useState('');
-  const [editPlayerAvatarUrl, setEditPlayerAvatarUrl] = useState('');
-
-  // Tournament & Scrim Form States
-  const [tourneyName, setTourneyName] = useState('');
-  const [tourneyDate, setTourneyDate] = useState(new Date().toISOString().split('T')[0]);
-  const [tourneyPrize, setTourneyPrize] = useState('');
-  const [tourneyImageUrl, setTourneyImageUrl] = useState('');
-  
-  const [scrimName, setScrimName] = useState('');
-  const [scrimDate, setScrimDate] = useState(new Date().toISOString().split('T')[0]);
-  const [scrimMatches, setScrimMatches] = useState('5');
-  const [scrimImageUrl, setScrimImageUrl] = useState('');
-
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [killPts, setKillPts] = useState('');
-  const [placePts, setPlacePts] = useState('');
-
-  const [selectedScrimTeamId, setSelectedScrimTeamId] = useState('');
-  const [scrimKillPts, setScrimKillPts] = useState('');
-  const [scrimPlacePts, setScrimPlacePts] = useState('');
-
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
-  const [teamModalStatTab, setTeamModalStatTab] = useState<'scrims' | 'tournaments'>('scrims');
-  const [teamViewMode, setTeamViewMode] = useState<'total' | 'average'>('total');
+  const [teamModalDetailTab, setTeamModalDetailTab] = useState<'roster' | 'overview' | 'scrims' | 'tournaments'>('roster');
 
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [playerModalTab, setPlayerModalTab] = useState<'scrims' | 'tournaments'>('scrims');
 
-  // --- IMAGE LIGHTBOX POPUP STATE & ERROR HANDLER ---
+  const [showBatchScoreModal, setShowBatchScoreModal] = useState(false);
+  const [selectedScrimSessionId, setSelectedScrimSessionId] = useState<string>('');
+  const [batchPlayerScores, setBatchPlayerScores] = useState<{ [playerId: string]: { kills: number; assists: number; damage: number; survived: number; rescue: number; matches: number } }>({});
+
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [activeHistoryScrim, setActiveHistoryScrim] = useState<any | null>(null);
+
+  const [scrimNameInput, setScrimNameInput] = useState('');
+  const [scrimKillPts, setScrimKillPts] = useState(0);
+  const [scrimPlacePts, setScrimPlacePts] = useState(0);
+  const [scrimMatchesInput, setScrimMatchesInput] = useState(5);
+
+  const [tourneyNameInput, setTourneyNameInput] = useState('');
+  const [tourneyKillPts, setTourneyKillPts] = useState(0);
+  const [tourneyPlacePts, setTourneyPlacePts] = useState(0);
+  const [tourneyMatchesInput, setTourneyMatchesInput] = useState(5);
+
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [imageHasError, setImageHasError] = useState(false);
 
@@ -101,145 +60,30 @@ export default function Home() {
   const [newTeamPlayerSubRole, setNewTeamPlayerSubRole] = useState('');
   const [newTeamPlayerAvatar, setNewTeamPlayerAvatar] = useState('');
 
-  // --- BATCH ADD PLAYER STATS BY TEAM ---
-  const [batchStatTeamId, setBatchStatTeamId] = useState('');
-  const [batchTargetType, setBatchTargetType] = useState<'scrims' | 'tournaments'>('scrims');
-  const [batchPlayerValues, setBatchPlayerValues] = useState<{ [playerId: string]: { matches: string; kills: string; assists: string; damage: string; survived: string; rescue: string } }>({});
-
   useEffect(() => {
     fetchAllData();
-    fetchVaultFiles();
   }, []);
-
-  useEffect(() => {
-    if (selectedTournament) fetchScores(selectedTournament);
-  }, [selectedTournament]);
-
-  useEffect(() => {
-    if (selectedScrimTournament) fetchScrimScores(selectedScrimTournament);
-  }, [selectedScrimTournament]);
 
   useEffect(() => {
     setImageHasError(false);
   }, [selectedPlayer]);
 
-  useEffect(() => {
-    setBatchPlayerValues({});
-  }, [batchStatTeamId]);
-
   async function fetchAllData() {
     try {
       const { data: tData } = await supabase.from('teams').select('*').order('name', { ascending: true });
       const { data: pData } = await supabase.from('players').select('*').order('total_kills', { ascending: false });
-      const { data: tourData } = await supabase.from('tournaments').select('*').order('created_at', { ascending: false });
       const { data: scoreData } = await supabase.from('tournament_scores').select('*');
-      const { data: scrimData } = await supabase.from('scrim_tournaments').select('*').order('created_at', { ascending: false });
       const { data: scrimScoreData } = await supabase.from('scrim_scores').select('*');
+      const { data: historyData } = await supabase.from('player_score_history').select('*');
 
       setTeams(tData || []);
       setPlayers(pData || []);
-      setTournaments(tourData || []);
       setAllScores(scoreData || []);
-      setScrimTournaments(scrimData || []);
       setAllScrimScores(scrimScoreData || []);
-
-      if (tourData && tourData.length > 0) {
-        if (!selectedTournament || !tourData.some((tr: any) => tr.id === selectedTournament)) {
-          setSelectedTournament(tourData[0].id);
-        }
-      } else {
-        setSelectedTournament('');
-      }
-      
-      if (scrimData && scrimData.length > 0) {
-        if (!selectedScrimTournament || !scrimData.some((st: any) => st.id === selectedScrimTournament)) {
-          setSelectedScrimTournament(scrimData[0].id);
-        }
-      } else {
-        setSelectedScrimTournament('');
-      }
+      setAllScoreHistory(historyData || []);
     } catch (err) {
       console.error(err);
     }
-  }
-
-  async function fetchVaultFiles() {
-    try {
-      const { data, error } = await supabase.storage.from('esports-assets').list('', {
-        limit: 100,
-        sortBy: { column: 'created_at', order: 'desc' }
-      });
-      if (error) {
-        console.error('Error fetching vault:', error.message);
-        return;
-      }
-      if (data) {
-        const filesWithUrl = data.map(file => {
-          const { data: pubData } = supabase.storage.from('esports-assets').getPublicUrl(file.name);
-          return {
-            ...file,
-            publicUrl: pubData.publicUrl
-          };
-        });
-        setVaultFiles(filesWithUrl);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function handleUploadToVault(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!requireAdmin()) return;
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploadingImage(true);
-    const file = files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-
-    const { error } = await supabase.storage.from('esports-assets').upload(fileName, file);
-
-    if (error) {
-      alert('อัปโหลดรูปไม่สำเร็จ: ' + error.message);
-    } else {
-      alert('อัปโหลดรูปเข้าคลังสำเร็จ!');
-      fetchVaultFiles();
-    }
-    setUploadingImage(false);
-    e.target.value = '';
-  }
-
-  async function handleDeleteVaultFile(fileName: string) {
-    if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบรูป "${fileName}" จากคลังใช่หรือไม่?`)) return;
-
-    const { error } = await supabase.storage.from('esports-assets').remove([fileName]);
-    if (error) {
-      alert('ลบรูปไม่สำเร็จ: ' + error.message);
-    } else {
-      fetchVaultFiles();
-    }
-  }
-
-  async function fetchScores(tId: string) {
-    if (!tId) {
-      setScores([]);
-      return;
-    }
-    const { data } = await supabase.from('tournament_scores').select('*').eq('tournament_id', tId);
-    const processed = (data || []).map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) })).sort((a, b) => b.total - a.total);
-    setScores(processed);
-  }
-
-  async function fetchScrimScores(stId: string) {
-    if (!stId) {
-      setScrimScores([]);
-      return;
-    }
-    const { data } = await supabase.from('scrim_scores').select('*').eq('scrim_tournament_id', stId);
-    const processed = (data || []).map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) })).sort((a, b) => b.total - a.total);
-    setScrimScores(processed);
   }
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -261,6 +105,26 @@ export default function Home() {
     }
     return true;
   };
+
+  async function handleDirectImageUpload(e: React.ChangeEvent<HTMLInputElement>, setterFunc: (url: string) => void) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+    const { error } = await supabase.storage.from('esports-assets').upload(fileName, file);
+    if (error) {
+      alert('อัปโหลดรูปไม่สำเร็จ: ' + error.message);
+      return;
+    }
+
+    const { data: pubData } = supabase.storage.from('esports-assets').getPublicUrl(fileName);
+    if (pubData) {
+      setterFunc(pubData.publicUrl);
+      alert('อัปโหลดรูปสำเร็จ!');
+    }
+  }
 
   async function handleAddTeam(e: React.FormEvent) {
     e.preventDefault();
@@ -301,113 +165,6 @@ export default function Home() {
     fetchAllData();
   }
 
-  async function handleUpdatePlayer(e: React.FormEvent) {
-    e.preventDefault();
-    if (!requireAdmin() || !editingPlayer) return;
-    if (!editIgn.trim()) return alert('กรุณากรอกชื่อ IGN');
-
-    const { error } = await supabase.from('players').update({
-      ign: editIgn.trim(),
-      role: editRole,
-      sub_role: editSubRole || null,
-      avatar_url: editPlayerAvatarUrl.trim() || null
-    }).eq('id', editingPlayer.id);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการอัปเดตข้อมูลผู้เล่น: ' + error.message);
-      return;
-    }
-
-    setEditingPlayer(null);
-    fetchAllData();
-    alert('อัปเดตข้อมูลผู้เล่นเรียบร้อยแล้ว!');
-  }
-
-  async function handleDeletePlayer(playerId: string, playerIgn: string) {
-    if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบ Player "${playerIgn}" ออกจากระบบถาวรใช่หรือไม่?`)) return;
-    await supabase.from('players').delete().eq('id', playerId);
-    if (selectedPlayer?.id === playerId) setSelectedPlayer(null);
-    fetchAllData();
-  }
-
-  async function handleBatchUpdatePlayerStats(e: React.FormEvent) {
-    e.preventDefault();
-    if (!requireAdmin()) return;
-    if (!batchStatTeamId) return alert('กรุณาเลือก Team');
-
-    const teamPlayers = players.filter(p => String(p.team_id) === String(batchStatTeamId));
-    if (teamPlayers.length === 0) return alert('ไม่มีผู้เล่นในทีมนี้');
-
-    let updatedCount = 0;
-
-    for (const p of teamPlayers) {
-      const vals = batchPlayerValues[p.id];
-      if (!vals) continue;
-
-      const addM = parseInt(vals.matches || '0');
-      const addK = parseInt(vals.kills || '0');
-      const addA = parseInt(vals.assists || '0');
-      const addD = parseInt(vals.damage || '0');
-      const addS = parseInt(vals.survived || '0');
-      const addR = parseInt(vals.rescue || '0');
-
-      if (addM === 0 && addK === 0 && addA === 0 && addD === 0 && addS === 0 && addR === 0) continue;
-
-      let updateData: any = {};
-      if (batchTargetType === 'scrims') {
-        updateData = { 
-          total_matches: Number(p.total_matches || 0) + addM,
-          total_kills: Number(p.total_kills || 0) + addK,
-          Assists: Number(p.Assists || 0) + addA,
-          Damage: Number(p.Damage || 0) + addD,
-          Survived: Number(p.Survived || 0) + addS,
-          Rescue: Number(p.Rescue || 0) + addR
-        };
-      } else {
-        updateData = { 
-          tourney_matches: Number(p.tourney_matches || 0) + addM,
-          tourney_kills: Number(p.tourney_kills || 0) + addK,
-          tourney_assists: Number(p.tourney_assists || 0) + addA,
-          tourney_damage: Number(p.tourney_damage || 0) + addD,
-          tourney_survived: Number(p.tourney_survived || 0) + addS,
-          tourney_rescue: Number(p.tourney_rescue || 0) + addR
-        };
-      }
-
-      const { error } = await supabase.from('players').update(updateData).eq('id', p.id);
-      if (!error) updatedCount++;
-    }
-
-    if (updatedCount > 0) {
-      setBatchPlayerValues({});
-      setBatchStatTeamId('');
-      fetchAllData();
-      alert(`อัปเดตสถิติ (${batchTargetType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'}) ให้ผู้เล่นในทีมเรียบร้อยแล้ว!`);
-    } else {
-      alert('ยังไม่ได้กรอกข้อมูลเพิ่มแต้มสำหรับผู้เล่นคนใดเลย');
-    }
-  }
-
-  async function handleResetPlayerStats(playerId: string, playerIgn: string) {
-    if (!requireAdmin()) return;
-    if (!confirm(`ต้องการลบแต้มสถิติทั้งหมดของ "${playerIgn}" ให้เป็น 0 ใช่หรือไม่?`)) return;
-
-    const { error } = await supabase.from('players').update({ 
-      total_matches: 0, total_kills: 0, Assists: 0, Damage: 0, Survived: 0, Rescue: 0,
-      tourney_matches: 0, tourney_kills: 0, tourney_assists: 0, tourney_damage: 0, tourney_survived: 0, tourney_rescue: 0
-    }).eq('id', playerId);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการล้างแต้ม: ' + error.message);
-      return;
-    }
-
-    setSelectedPlayer(null);
-    fetchAllData();
-    alert(`ล้างแต้มของ ${playerIgn} เรียบร้อยแล้ว!`);
-  }
-
   async function handleCreatePlayerForTeam(teamId: string) {
     if (!requireAdmin()) return;
     if (!newTeamPlayerIgn.trim()) return alert('กรุณากรอกชื่อ IGN');
@@ -421,304 +178,242 @@ export default function Home() {
       total_matches: 0, total_kills: 0, Assists: 0, Damage: 0, Survived: 0, Rescue: 0,
       tourney_matches: 0, tourney_kills: 0, tourney_assists: 0, tourney_damage: 0, tourney_survived: 0, tourney_rescue: 0
     }]);
-    setNewTeamPlayerIgn('');
-    setNewTeamPlayerSubRole('');
-    setNewTeamPlayerAvatar('');
+    setNewTeamPlayerIgn(''); setNewTeamPlayerSubRole(''); setNewTeamPlayerAvatar('');
     await fetchAllData();
   }
 
-  async function handleRemovePlayerFromTeam(playerId: string) {
+  async function handleDeletePlayerCompletely(playerId: string, playerIgn: string) {
     if (!requireAdmin()) return;
-    await supabase.from('players').update({ team_id: null, status: 'LFT' }).eq('id', playerId);
-    fetchAllData();
-  }
-
-  async function handleAddTournament(e: React.FormEvent) {
-    e.preventDefault();
-    if (!requireAdmin()) return;
-    if (!tourneyName.trim()) return;
+    if (!confirm(`ต้องการลบผู้เล่น "${playerIgn}" ออกจากระบบใช่หรือไม่?`)) return;
     
-    const { data, error } = await supabase.from('tournaments').insert([{ 
-      name: tourneyName.trim(),
-      created_at: tourneyDate ? new Date(tourneyDate).toISOString() : new Date().toISOString(),
-      prize_pool: tourneyPrize.trim() || null,
-      image_url: tourneyImageUrl.trim() || null
-    }]).select();
-
+    const { error } = await supabase.from('players').delete().eq('id', playerId);
     if (error) {
-      alert('เกิดข้อผิดพลาดในการสร้างทัวร์นาเมนต์: ' + error.message);
+      alert('เกิดข้อผิดพลาด: ' + error.message);
       return;
     }
 
-    setTourneyName(''); setTourneyPrize(''); setTourneyImageUrl(''); setShowTourneyForm(false);
-    fetchAllData();
-    if (data && data[0]) setSelectedTournament(data[0].id);
+    await fetchAllData();
+
+    const { data: updatedTeams } = await supabase.from('teams').select('*').order('name', { ascending: true });
+    const { data: updatedPlayers } = await supabase.from('players').select('*');
+    
+    if (updatedTeams && updatedPlayers && selectedTeam) {
+      const refreshedTeam = updatedTeams.find((t: any) => String(t.id) === String(selectedTeam.id));
+      if (refreshedTeam) {
+        const teamTourneyScores = allScores.filter(s => String(s.team_id) === String(refreshedTeam.id));
+        const teamScrimScores = allScrimScores.filter(s => String(s.team_id) === String(refreshedTeam.id));
+        const sortedRoster = updatedPlayers
+          .filter((p: any) => String(p.team_id) === String(refreshedTeam.id))
+          .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+
+        const totalScrimPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalTourneyPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+        const totalScrimKillPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
+        const totalScrimPlacePts = teamScrimScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
+        const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
+        const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
+        const totalScrimMatches = teamScrimScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+        const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+
+        setSelectedTeam({
+          ...refreshedTeam,
+          totalTourneyPts,
+          totalScrimPts,
+          totalScrimKillPts,
+          totalScrimPlacePts,
+          totalTourneyKillPts,
+          totalTourneyPlacePts,
+          totalScrimMatches,
+          totalTourneyMatches,
+          avgScrimPts: totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00',
+          avgTourneyPts: totalTourneyMatches > 0 ? (totalTourneyPts / totalTourneyMatches).toFixed(2) : '0.00',
+          roster: sortedRoster,
+          scrimHistory: teamScrimScores,
+          tourneyHistory: teamTourneyScores
+        });
+      }
+    }
+    alert('ลบผู้เล่นออกจากระบบสำเร็จ!');
   }
 
-  async function handleDeleteTournament(tourneyId: string) {
+  async function handleSaveBatchPlayerScores(team: any) {
     if (!requireAdmin()) return;
-    const targetTourney = tournaments.find(tr => String(tr.id) === String(tourneyId));
-    if (!confirm(`ต้องการลบทัวร์นาเมนต์ "${targetTourney?.name || ''}" ใช่หรือไม่? (คะแนนในทัวร์นี้จะถูกลบทั้งหมด)`)) return;
+    if (!selectedScrimSessionId) return alert('กรุณาเลือกห้องซ้อม/แมตช์ที่ต้องการอ้างอิงก่อน');
 
-    await supabase.from('tournament_scores').delete().eq('tournament_id', tourneyId);
-    const { error } = await supabase.from('tournaments').delete().eq('id', tourneyId);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการลบทัวร์นาเมนต์: ' + error.message);
+    const sessionHistoryCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
+    if (sessionHistoryCount >= 6) {
+      alert('❌ ห้องซ้อมนี้ถูกกรอกคะแนนครบขีดจำกัด 6 ครั้งแล้ว ไม่สามารถกรอกเพิ่มได้อีก');
       return;
     }
 
-    setSelectedTournament('');
-    fetchAllData();
-    alert('ลบทัวร์นาเมนต์เรียบร้อยแล้ว!');
-  }
+    const targetScrim = team.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
+    const maxScrimKills = Number(targetScrim?.kill_points) || 0;
 
-  async function handleAddScrim(e: React.FormEvent) {
-    e.preventDefault();
-    if (!requireAdmin()) return;
-    if (!scrimName.trim()) return;
-    const { data, error } = await supabase.from('scrim_tournaments').insert([{ 
-      name: scrimName.trim(), 
-      scrim_date: scrimDate,
-      total_matches: parseInt(scrimMatches || '5'),
-      image_url: scrimImageUrl.trim() || null
-    }]).select();
+    const totalInputKills = Object.values(batchPlayerScores).reduce((sum, p) => sum + (Number(p.kills) || 0), 0);
 
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการสร้างห้องซ้อม: ' + error.message);
+    if (totalInputKills > maxScrimKills) {
+      alert(`❌ คะแนนคิลรวมของผู้เล่นทุกคน (${totalInputKills}) ห้ามเกินคะแนนคิลของห้องซ้อมนี้ (${maxScrimKills} คิล)`);
       return;
     }
 
-    setScrimName(''); setScrimMatches('5'); setScrimImageUrl(''); setShowScrimForm(false);
-    fetchAllData();
-    if (data && data[0]) setSelectedScrimTournament(data[0].id);
-  }
+    try {
+      for (const player of team.roster) {
+        const stats = batchPlayerScores[player.id];
+        if (stats) {
+          await supabase.from('players').update({
+            total_matches: Number(stats.matches) || 0,
+            total_kills: Number(stats.kills) || 0,
+            Assists: Number(stats.assists) || 0,
+            Damage: Number(stats.damage) || 0,
+            Survived: Number(stats.survived) || 0,
+            Rescue: Number(stats.rescue) || 0,
+            last_scrim_session_id: String(selectedScrimSessionId)
+          }).eq('id', player.id);
 
-  async function handleDeleteScrim(scrimId: string) {
-    if (!requireAdmin()) return;
-    const targetScrim = scrimTournaments.find(st => String(st.id) === String(scrimId));
-    if (!confirm(`ต้องการลบห้องซ้อม "${targetScrim?.name || ''}" ใช่หรือไม่? (คะแนนในห้องนี้จะถูกลบทั้งหมด)`)) return;
+          await supabase.from('player_score_history').insert([{
+            scrim_session_id: String(selectedScrimSessionId),
+            team_id: team.id,
+            player_id: player.id,
+            ign: player.ign,
+            matches: Number(stats.matches) || 0,
+            kills: Number(stats.kills) || 0,
+            assists: Number(stats.assists) || 0,
+            damage: Number(stats.damage) || 0,
+            survived: Number(stats.survived) || 0,
+            rescue: Number(stats.rescue) || 0
+          }]);
+        }
+      }
 
-    await supabase.from('scrim_scores').delete().eq('scrim_tournament_id', scrimId);
-    const { error } = await supabase.from('scrim_tournaments').delete().eq('id', scrimId);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการลบห้องซ้อม: ' + error.message);
-      return;
+      alert('บันทึกคะแนนและประวัติสำเร็จ!');
+      setShowBatchScoreModal(false);
+      fetchAllData();
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
     }
-
-    setSelectedScrimTournament('');
-    fetchAllData();
-    alert('ลบห้องซ้อมเรียบร้อยแล้ว!');
   }
 
-  async function handleAddScore(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleAddScrimScore(teamId: string) {
     if (!requireAdmin()) return;
-    if (!selectedTournament || !selectedTeamId) return;
-    await supabase.from('tournament_scores').insert([{
-      tournament_id: selectedTournament,
-      team_id: selectedTeamId,
-      kill_points: parseInt(killPts || '0'),
-      placement_points: parseInt(placePts || '0')
+    if (!scrimNameInput.trim()) return alert('กรุณากรอกชื่อห้องซ้อม');
+    const { error } = await supabase.from('scrim_scores').insert([{
+      scrim_name: scrimNameInput.trim(),
+      team_id: teamId,
+      kill_points: Number(scrimKillPts) || 0,
+      placement_points: Number(scrimPlacePts) || 0,
+      matches: Number(scrimMatchesInput) || 5
     }]);
-    setSelectedTeamId(''); setKillPts(''); setPlacePts('');
-    fetchScores(selectedTournament);
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+    setScrimNameInput(''); setScrimKillPts(0); setScrimPlacePts(0); setScrimMatchesInput(5);
+    alert('บันทึกคะแนนห้องซ้อมสำเร็จ!');
     fetchAllData();
   }
 
-  async function handleAddScrimScore(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleAddTourneyScore(teamId: string) {
     if (!requireAdmin()) return;
-    if (!selectedScrimTournament || !selectedScrimTeamId) return;
-    await supabase.from('scrim_scores').insert([{
-      scrim_tournament_id: selectedScrimTournament,
-      team_id: selectedScrimTeamId,
-      kill_points: parseInt(scrimKillPts || '0'),
-      placement_points: parseInt(scrimPlacePts || '0')
+    if (!tourneyNameInput.trim()) return alert('กรุณากรอกชื่อทัวร์นาเมนต์');
+    const { error } = await supabase.from('tournament_scores').insert([{
+      tournament_name: tourneyNameInput.trim(),
+      team_id: teamId,
+      kill_points: Number(tourneyKillPts) || 0,
+      placement_points: Number(tourneyPlacePts) || 0,
+      matches: Number(tourneyMatchesInput) || 5
     }]);
-    setSelectedScrimTeamId(''); setScrimKillPts(''); setScrimPlacePts('');
-    fetchScrimScores(selectedScrimTournament);
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+    setTourneyNameInput(''); setTourneyKillPts(0); setTourneyPlacePts(0); setTourneyMatchesInput(5);
+    alert('บันทึกคะแนนทัวร์นาเมนต์สำเร็จ!');
     fetchAllData();
   }
-
-  // --- TIME FILTER HELPER LOGIC ---
-  const now = new Date();
-  
-  const filterScrimIds = scrimTournaments.filter(st => {
-    if (timeFilter === 'all') return true;
-    if (!st.scrim_date) return true;
-    const stDate = new Date(st.scrim_date);
-    const diffTime = now.getTime() - stDate.getTime();
-    const diffDays = diffTime / (1000 * 3600 * 24);
-    if (timeFilter === '1d') return diffDays <= 1;
-    if (timeFilter === '7d') return diffDays <= 7;
-    if (timeFilter === '30d') return diffDays <= 30;
-    return true;
-  }).map(st => st.id);
-
-  const filterTourneyIds = tournaments.filter(tr => {
-    if (timeFilter === 'all') return true;
-    if (!tr.created_at) return true;
-    const trDate = new Date(tr.created_at);
-    const diffTime = now.getTime() - trDate.getTime();
-    const diffDays = diffTime / (1000 * 3600 * 24);
-    if (timeFilter === '1d') return diffDays <= 1;
-    if (timeFilter === '7d') return diffDays <= 7;
-    if (timeFilter === '30d') return diffDays <= 30;
-    return true;
-  }).map(tr => tr.id);
-
-  const filteredPlayers = players.filter(p => {
-    const matchesRole = selectedRoleFilter === 'ALL' || p.role === selectedRoleFilter || p.sub_role === selectedRoleFilter;
-    const matchesSearch = playerSearchQuery.trim() === '' || p.ign.toLowerCase().includes(playerSearchQuery.toLowerCase().trim());
-    return matchesRole && matchesSearch;
-  });
-
-  const rankedScrimPlayers = [...filteredPlayers].sort((a, b) => {
-    const killsA = a.total_kills || 0;
-    const killsB = b.total_kills || 0;
-    if (killsB !== killsA) return killsB - killsA;
-
-    const assistA = a.Assists || 0;
-    const assistB = b.Assists || 0;
-    if (assistB !== assistA) return assistB - assistA;
-
-    const dmgA = a.Damage || 0;
-    const dmgB = b.Damage || 0;
-    return dmgB - dmgA;
-  });
-
-  const rankedTourneyPlayers = [...filteredPlayers].sort((a, b) => {
-    const killsA = a.tourney_kills || 0;
-    const killsB = b.tourney_kills || 0;
-    if (killsB !== killsA) return killsB - killsA;
-
-    const assistA = a.tourney_assists || 0;
-    const assistB = b.tourney_assists || 0;
-    if (assistB !== assistA) return assistB - assistA;
-
-    const dmgA = a.tourney_damage || 0;
-    const dmgB = b.tourney_damage || 0;
-    return dmgB - dmgA;
-  });
 
   const teamsWithScores = teams.map(team => {
-    const teamTourneyScores = allScores.filter(s => 
-      String(s.team_id) === String(team.id) && 
-      filterTourneyIds.includes(s.tournament_id)
-    );
-    
-    const teamScrimScores = allScrimScores.filter(s => 
-      String(s.team_id) === String(team.id) && 
-      filterScrimIds.includes(s.scrim_tournament_id)
-    );
+    const teamTourneyScores = allScores.filter(s => String(s.team_id) === String(team.id));
+    const teamScrimScores = allScrimScores.filter(s => String(s.team_id) === String(team.id));
 
     const totalTourneyPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
     const totalScrimPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
+
+    const totalScrimKillPts = teamScrimScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
+    const totalScrimPlacePts = teamScrimScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
+
+    const totalTourneyKillPts = teamTourneyScores.reduce((sum, s) => sum + (s.kill_points || 0), 0);
+    const totalTourneyPlacePts = teamTourneyScores.reduce((sum, s) => sum + (s.placement_points || 0), 0);
+
+    const totalScrimMatches = teamScrimScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+    const totalTourneyMatches = teamTourneyScores.reduce((sum, s) => sum + (Number(s.matches) || 5), 0);
+
+    const avgScrimPts = totalScrimMatches > 0 ? (totalScrimPts / totalScrimMatches).toFixed(2) : '0.00';
+    const avgTourneyPts = totalTourneyMatches > 0 ? (totalTourneyPts / totalTourneyMatches).toFixed(2) : '0.00';
+
+    const sortedRoster = players
+      .filter(p => String(p.team_id) === String(team.id))
+      .sort((a, b) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
 
     return {
       ...team,
       totalTourneyPts,
       totalScrimPts,
-      roster: players.filter(p => String(p.team_id) === String(team.id)),
-      scrimHistory: allScrimScores.filter(s => String(s.team_id) === String(team.id)),
-      tourneyHistory: allScores.filter(s => String(s.team_id) === String(team.id))
+      totalScrimKillPts,
+      totalScrimPlacePts,
+      totalTourneyKillPts,
+      totalTourneyPlacePts,
+      totalScrimMatches,
+      totalTourneyMatches,
+      avgScrimPts,
+      avgTourneyPts,
+      roster: sortedRoster,
+      scrimHistory: teamScrimScores,
+      tourneyHistory: teamTourneyScores
     };
   });
 
-  const filteredScrimTeams = teamsWithScores.filter(t => {
+  const filteredTeams = teamsWithScores.filter(t => {
     if (!teamSearchQuery.trim()) return true;
-    const query = teamSearchQuery.toLowerCase().trim();
-    return t.name.toLowerCase().includes(query) || t.tag.toLowerCase().includes(query);
+    return t.name.toLowerCase().includes(teamSearchQuery.toLowerCase().trim()) || t.tag.toLowerCase().includes(teamSearchQuery.toLowerCase().trim());
   });
 
-  const rankedScrimTeams = [...filteredScrimTeams].sort((a, b) => b.totalScrimPts - a.totalScrimPts);
-  const rankedTourneyTeams = [...filteredScrimTeams].sort((a, b) => b.totalTourneyPts - a.totalTourneyPts);
+  const rankedTeams = [...filteredTeams].sort((a, b) => a.name.localeCompare(b.name));
+  const topPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0)).slice(0, 5);
 
-  // --- HELPER FUNCTION: RENDER 5-AXIS RADAR CHART ---
   const renderRadarChart = (matches: number, kills: number, assists: number, damage: number, survived: number, rescue: number) => {
     const m = matches > 1 ? matches : 1;
-    const avgK = kills / m;
-    const avgA = assists / m;
-    const avgD = damage / m;
-    const avgS = survived / m;
-    const avgR = rescue / m;
+    const pK = Math.min(Math.max(((kills / m) / 4) * 100, 10), 100);
+    const pA = Math.min(Math.max(((assists / m) / 3) * 100, 10), 100);
+    const pD = Math.min(Math.max(((damage / m) / 700) * 100, 10), 100);
+    const pS = Math.min(Math.max(((survived / m) / 30) * 100, 10), 100);
+    const pR = Math.min(Math.max(((rescue / m) / 4) * 100, 10), 100);
 
-    const pK = Math.min(Math.max((avgK / 4) * 100, 10), 100);
-    const pA = Math.min(Math.max((avgA / 3) * 100, 10), 100);
-    const pD = Math.min(Math.max((avgD / 700) * 100, 10), 100);
-    const pS = Math.min(Math.max((avgS / 30) * 100, 10), 100);
-    const pR = Math.min(Math.max((avgR / 4) * 100, 10), 100); 
-
-    const size = 180;
-    const center = size / 2;
-    const radius = 65;
-
+    const size = 180; const center = size / 2; const radius = 65;
     const getCoordinates = (value: number, index: number) => {
       const angle = (Math.PI * 2 / 5) * index - Math.PI / 2;
       const r = (radius * value) / 100;
-      const x = center + r * Math.cos(angle);
-      const y = center + r * Math.sin(angle);
-      return { x, y };
+      return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
     };
-
-    const pointsArr = [
-      getCoordinates(pK, 0),
-      getCoordinates(pA, 1),
-      getCoordinates(pD, 2),
-      getCoordinates(pR, 3),
-      getCoordinates(pS, 4),
-    ];
-
-    const pointsString = pointsArr.map(p => `${p.x},${p.y}`).join(' ');
+    const pts = [getCoordinates(pK, 0), getCoordinates(pA, 1), getCoordinates(pD, 2), getCoordinates(pR, 3), getCoordinates(pS, 4)];
+    const ptsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
 
     return (
       <div className="flex flex-col items-center justify-center my-2">
         <svg width={size} height={size} className="overflow-visible">
-          {[0.2, 0.4, 0.6, 0.8, 1].map((level, idx) => {
-            const lvlPoints = [0, 1, 2, 3, 4].map(i => {
+          {[0.2, 0.4, 0.6, 0.8, 1].map((lvl, idx) => {
+            const lvlPts = [0,1,2,3,4].map(i => {
               const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
-              const r = radius * level;
+              const r = radius * lvl;
               return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
             }).join(' ');
-            return (
-              <polygon
-                key={idx}
-                points={lvlPoints}
-                fill="none"
-                stroke="#27272a"
-                strokeWidth="1"
-              />
-            );
+            return <polygon key={idx} points={lvlPts} fill="none" stroke="#27272a" strokeWidth="1" />;
           })}
-
-          {[0, 1, 2, 3, 4].map(i => {
+          {[0,1,2,3,4].map(i => {
             const pt = getCoordinates(100, i);
-            return (
-              <line
-                key={i}
-                x1={center}
-                y1={center}
-                x2={pt.x}
-                y2={pt.y}
-                stroke="#3f3f46"
-                strokeWidth="1"
-              />
-            );
+            return <line key={i} x1={center} y1={center} x2={pt.x} y2={pt.y} stroke="#3f3f46" strokeWidth="1" />;
           })}
-
-          <polygon
-            points={pointsString}
-            fill="rgba(56, 189, 248, 0.35)"
-            stroke="#38bdf8"
-            strokeWidth="2"
-          />
-
-          {pointsArr.map((pt, i) => (
-            <circle key={i} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />
-          ))}
-
+          <polygon points={ptsStr} fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" strokeWidth="2" />
+          {pts.map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
           <text x={center} y={center - radius - 8} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">Kill</text>
           <text x={center + radius + 14} y={center - 15} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">Assist</text>
           <text x={center + radius + 10} y={center + radius + 10} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">Dmg</text>
@@ -731,68 +426,39 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-slate-100 font-sans p-4 max-w-md mx-auto border-x border-zinc-900 shadow-2xl relative">
-      {/* Header เมนูหลัก */}
-      <header className="py-3 border-b border-zinc-800 mb-4 space-y-3">
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="flex items-baseline gap-2">
-              <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
-              <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
-            </div>
-          </div>
-          <div>
-            {isAdmin ? (
-              <span className="inline-block bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[9px] px-2 py-0.5 rounded font-bold">
-                🔓 แอดมิน
-              </span>
-            ) : (
-              <button
-                onClick={() => setShowLoginModal(true)}
-                className="bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 text-[9px] px-2 py-0.5 rounded font-bold transition"
-              >
-                🔐 เข้าสู่ระบบแอดมิน
-              </button>
-            )}
+      <header className="py-3 border-b border-zinc-800 mb-4 flex justify-between items-center">
+        <div>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-sm font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h1>
+            <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
           </div>
         </div>
-
-        {/* เมนูบาร์หลัก (แสดงปุ่ม "📁 คลังรูป" เฉพาะตอนเป็นแอดมินเท่านั้น) */}
-        <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800`}>
-          <button 
-            onClick={() => setActiveTab('teams')} 
-            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'teams' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
-          >
-            🛡️ Team
-          </button>
-          <button 
-            onClick={() => setActiveTab('players')} 
-            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'players' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
-          >
-            🎯 Player
-          </button>
-          <button 
-            onClick={() => setActiveTab('matches')} 
-            className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'matches' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
-          >
-            📊 SCRIM
-          </button>
-          {isAdmin && (
-            <button 
-              onClick={() => setActiveTab('vault')} 
-              className={`py-2 text-[11px] font-bold rounded-lg transition text-center ${activeTab === 'vault' ? 'bg-sky-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+        <div>
+          {isAdmin ? (
+            <button
+              onClick={() => {
+                setIsAdmin(false);
+                alert('ออกจากระบบแอดมินแล้ว');
+              }}
+              className="bg-emerald-500/20 hover:bg-red-500/20 border border-emerald-500/40 hover:border-red-500/40 text-emerald-400 hover:text-red-400 text-[9px] px-2.5 py-1 rounded font-bold transition cursor-pointer"
             >
-              📁 คลังรูป
+              🔓 แอดมิน (คลิกออก)
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 text-[9px] px-2.5 py-1 rounded font-bold transition"
+            >
+              🔐 เข้าสู่ระบบแอดมิน
             </button>
           )}
         </div>
       </header>
 
-      {/* Admin Login Modal */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl w-full max-w-xs space-y-4 shadow-2xl">
             <h2 className="text-sm font-bold text-sky-400">ยืนยันตัวตนผู้ดูแลระบบ</h2>
-            <p className="text-[11px] text-zinc-400">กรอกรหัสผ่านเพื่อสิทธิ์ในการเพิ่มหรือลบข้อมูล</p>
             <form onSubmit={handleAdminLogin} className="space-y-3">
               <input
                 type="password"
@@ -803,1337 +469,799 @@ export default function Home() {
                 autoFocus
               />
               <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2 rounded-xl text-xs transition"
-                >
-                  ยืนยัน
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition"
-                >
-                  ยกเลิก
-                </button>
+                <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2 rounded-xl text-xs transition">ยืนยัน</button>
+                <button type="button" onClick={() => setShowLoginModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">ยกเลิก</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ================= TAB 1: TEAMS ================= */}
-      {activeTab === 'teams' && (
-        <main className="space-y-3">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold text-zinc-300">🏆 ตารางจัดอันดับ Team ({teams.length} ทีม)</h2>
-            {isAdmin && teams.length < 20 && (
-              <button onClick={() => setShowTeamForm(!showTeamForm)} className="text-xs bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
-                {showTeamForm ? 'ปิด' : '+ เพิ่ม Team'}
+      <main className="space-y-3">
+        {isAdmin && (
+          <div className="bg-zinc-900/80 border border-sky-500/30 p-3 rounded-xl space-y-2 mb-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-bold text-sky-400">🔥 Top Players (ผู้เล่นคิลสูงสุด)</h3>
+              <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="text-[10px] bg-sky-500 text-black font-bold px-2 py-0.5 rounded">
+                {showPlayerForm ? 'ปิดฟอร์ม' : '+ เพิ่ม Player'}
               </button>
+            </div>
+
+            {showPlayerForm && (
+              <form onSubmit={handleAddPlayer} className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-2 text-xs mt-2">
+                <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]" />
+                <div className="space-y-1">
+                  <div className="flex gap-1">
+                    <input type="text" placeholder="รูปผู้เล่น (URL หรืออัปโหลด)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="flex-1 bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]" />
+                    <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-2 py-1 rounded text-[10px] cursor-pointer flex items-center justify-center border border-sky-500/30">
+                      📁 อัปโหลด
+                      <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setPlayerAvatarUrl)} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
+                    <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                  </select>
+                  <select value={playerTeamId} onChange={e => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
+                    <option value="">-- Free Agent (LFT) --</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1 rounded">บันทึก Player</button>
+              </form>
             )}
-          </div>
 
-          {isAdmin && showTeamForm && (
-            <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
-              <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
-              <input type="text" placeholder="ลิงก์โลโก้ทีม (Logo URL)" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Team</button>
-            </form>
-          )}
-
-          <input
-            type="text"
-            placeholder="🔍 ค้นหาชื่อทีมหรือ TAG (Search Team)..."
-            value={teamSearchQuery}
-            onChange={(e) => setTeamSearchQuery(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
-          />
-
-          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
-            <button onClick={() => setTeamSubTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 คะแนนซ้อม</button>
-            <button onClick={() => setTeamSubTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${teamSubTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 คะแนนทัวร์</button>
-          </div>
-
-          <div className="flex gap-1 bg-zinc-900 p-1 rounded-xl text-[11px] border border-zinc-800">
-            <button onClick={() => setTimeFilter('all')} className={`flex-1 py-1 rounded font-bold transition ${timeFilter === 'all' ? 'bg-sky-500 text-black' : 'text-zinc-400 hover:text-white'}`}>ทั้งหมด</button>
-            <button onClick={() => setTimeFilter('1d')} className={`flex-1 py-1 rounded font-bold transition ${timeFilter === '1d' ? 'bg-sky-500 text-black' : 'text-zinc-400 hover:text-white'}`}>1 วัน</button>
-            <button onClick={() => setTimeFilter('7d')} className={`flex-1 py-1 rounded font-bold transition ${timeFilter === '7d' ? 'bg-sky-500 text-black' : 'text-zinc-400 hover:text-white'}`}>7 วัน</button>
-            <button onClick={() => setTimeFilter('30d')} className={`flex-1 py-1 rounded font-bold transition ${timeFilter === '30d' ? 'bg-sky-500 text-black' : 'text-zinc-400 hover:text-white'}`}>30 วัน</button>
-          </div>
-
-          <div className="space-y-2.5">
-            {teamSubTab === 'scrims' ? (
-              rankedScrimTeams.length === 0 ? (
-                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Team ที่ค้นหา</div>
+            <div className="grid grid-cols-1 gap-1.5 pt-1">
+              {topPlayers.length === 0 ? (
+                <p className="text-[10px] text-zinc-500 text-center italic">ยังไม่มีข้อมูลผู้เล่น</p>
               ) : (
-                rankedScrimTeams.map((t, idx) => {
-                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
+                topPlayers.map((p, idx) => {
+                  const tInfo = teams.find(t => String(t.id) === String(p.team_id));
                   return (
-                    <div key={t.id} onClick={() => setSelectedTeam(t)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition shadow-sm ${
-                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
-                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
-                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
-                      'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
-                          isTop1 ? 'bg-red-500 text-white' : 
-                          isTop2 ? 'bg-orange-500 text-white' : 
-                          isTop3 ? 'bg-yellow-500 text-black' : 
-                          'bg-zinc-800 text-zinc-400'
-                        }`}>{idx + 1}</span>
-                        <div className="flex items-center gap-3">
-                          {t.logo_url && (
-                            <img 
-                              src={t.logo_url} 
-                              alt={t.name} 
-                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `โลโก้ทีม: [${t.tag}] ${t.name}` }); }}
-                              className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                              title="คลิกเพื่อดูรูปขนาดใหญ่"
-                            />
-                          )}
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
-                              <span className="font-bold text-sm text-white">{t.name}</span>
-                            </div>
-                            <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
-                          </div>
+                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className="bg-black p-2 rounded-lg border border-zinc-800 flex justify-between items-center cursor-pointer hover:border-sky-500 transition">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}>{idx + 1}</span>
+                        {p.avatar_url && <img src={p.avatar_url} alt={p.ign} className="w-7 h-7 object-cover rounded bg-zinc-950 border border-zinc-800" />}
+                        <div>
+                          <span className="text-white font-bold text-xs">{p.ign}</span>
+                          <span className="text-[9px] text-zinc-400 ml-1.5">[{tInfo ? tInfo.tag : 'LFT'}]</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มซ้อมรวม</span>
-                          <span className="text-base font-black text-sky-400">{t.totalScrimPts}</span>
-                        </div>
-                        {isAdmin && (
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
-                        )}
+                      <div className="text-right">
+                        <span className="text-[10px] font-black text-sky-400">{p.total_kills || 0} Kills</span>
                       </div>
                     </div>
                   );
                 })
-              )
-            ) : (
-              rankedTourneyTeams.length === 0 ? (
-                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Team ที่ค้นหา</div>
-              ) : (
-                rankedTourneyTeams.map((t, idx) => {
-                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
-                  return (
-                    <div key={t.id} onClick={() => setSelectedTeam(t)} className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer transition shadow-sm ${
-                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
-                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
-                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
-                      'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
-                          isTop1 ? 'bg-red-500 text-white' : 
-                          isTop2 ? 'bg-orange-500 text-white' : 
-                          isTop3 ? 'bg-yellow-500 text-black' : 
-                          'bg-zinc-800 text-zinc-400'
-                        }`}>{idx + 1}</span>
-                        <div className="flex items-center gap-3">
-                          {t.logo_url && (
-                            <img 
-                              src={t.logo_url} 
-                              alt={t.name} 
-                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `โลโก้ทีม: [${t.tag}] ${t.name}` }); }}
-                              className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                              title="คลิกเพื่อดูรูปขนาดใหญ่"
-                            />
-                          )}
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-black text-sky-400">[{t.tag}]</span>
-                              <span className="font-bold text-sm text-white">{t.name}</span>
-                            </div>
-                            <p className="text-[10px] text-zinc-400 mt-0.5">Player: {t.roster.length} คน</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">แต้มทัวร์รวม</span>
-                          <span className="text-base font-black text-sky-400">{t.totalTourneyPts}</span>
-                        </div>
-                        {isAdmin && (
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Team">🗑️</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )
-            )}
-          </div>
-        </main>
-      )}
-
-      {/* ================= TAB 2: PLAYERS ================= */}
-      {activeTab === 'players' && (
-        <main className="space-y-4 text-xs">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold text-zinc-300">🎯 Player และสถิตินักแข่ง</h2>
-            {isAdmin && (
-              <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
-                {showPlayerForm ? 'ปิด' : '+ เพิ่ม Player'}
-              </button>
-            )}
-          </div>
-
-          {isAdmin && showPlayerForm && (
-            <form onSubmit={handleAddPlayer} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
-              <input type="text" placeholder="ชื่อ IGN" value={ign} onChange={e => setIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL)" value={playerAvatarUrl} onChange={e => setPlayerAvatarUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-zinc-400 block mb-1">ตำแหน่งหลัก (Role)</label>
-                  <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-zinc-400 block mb-1">ตำแหน่งรอง (Sub Role)</label>
-                  <select value={subRole} onChange={e => setSubRole(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="">-- ไม่มีตำแหน่งรอง --</option>
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
-                </div>
-              </div>
-              <select value={playerTeamId} onChange={e => setPlayerTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                <option value="">-- Free Agent (LFT) --</option>
-                {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
-              </select>
-              <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Player</button>
-            </form>
-          )}
-
-          <div className="space-y-2">
-            <input
-              type="text"
-              placeholder="🔍 ค้นหาชื่อนักแข่ง (Search IGN)..."
-              value={playerSearchQuery}
-              onChange={(e) => setPlayerSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
-            />
-            <div className="flex gap-1 overflow-x-auto pb-1 text-[10px] bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-              {['ALL', 'IGL', 'ATK 1', 'ATK 2', 'Scout', 'Flex'].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setSelectedRoleFilter(r)}
-                  className={`flex-1 py-1 px-2 rounded font-bold whitespace-nowrap transition ${
-                    selectedRoleFilter === r ? 'bg-sky-500 text-black' : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {r === 'ALL' ? '🛡️ ทั้งหมด' : r}
-                </button>
-              ))}
+              )}
             </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl text-xs border border-zinc-800">
-            <button onClick={() => setPlayerStatTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 สถิติห้องซ้อม</button>
-            <button onClick={() => setPlayerStatTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerStatTab === 'tournaments' ? 'bg-sky-400 text-black shadow' : 'text-zinc-400'}`}>🏆 สถิติห้องแข่ง</button>
-          </div>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xs font-bold text-zinc-300">🏆 รายชื่อทีมทั้งหมด ({teams.length} ทีม)</h2>
+          {isAdmin && teams.length < 20 && (
+            <button onClick={() => setShowTeamForm(!showTeamForm)} className="text-xs bg-sky-500 text-black font-bold px-2.5 py-1 rounded">
+              {showTeamForm ? 'ปิด' : '+ เพิ่ม Team'}
+            </button>
+          )}
+        </div>
 
-          {isAdmin && (
-            <form onSubmit={handleBatchUpdatePlayerStats} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-3">
-              <div className="flex justify-between items-center">
-                <p className="font-bold text-sky-400">📈 เพิ่มสถิติผู้เล่น (เลือกทีมเพื่อกรอกรายทีม)</p>
-                <select value={batchTargetType} onChange={e => setBatchTargetType(e.target.value as any)} className="bg-black p-1 rounded text-sky-300 border border-zinc-800 text-[11px]">
-                  <option value="scrims">โหมด: ห้องซ้อม</option>
-                  <option value="tournaments">โหมด: ห้องแข่ง</option>
-                </select>
+        {isAdmin && showTeamForm && (
+          <form onSubmit={handleAddTeam} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2 text-xs">
+            <input type="text" placeholder="TAG (เช่น ALGX)" value={teamTag} onChange={e => setTeamTag(e.target.value)} className="w-full bg-black p-2 rounded text-white uppercase border border-zinc-800" />
+            <input type="text" placeholder="ชื่อ Team" value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
+            
+            <div className="space-y-1">
+              <label className="text-[10px] text-zinc-400 block">โลโก้ทีม (ใส่ URL หรืออัปโหลดรูป)</label>
+              <div className="flex gap-1">
+                <input type="text" placeholder="https://... หรืออัปโหลดรูปขวา" value={teamLogoUrl} onChange={e => setTeamLogoUrl(e.target.value)} className="flex-1 bg-black p-2 rounded text-white border border-zinc-800 text-xs" />
+                <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-3 py-2 rounded text-xs cursor-pointer flex items-center justify-center border border-sky-500/30">
+                  📁 อัปโหลด
+                  <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setTeamLogoUrl)} className="hidden" />
+                </label>
               </div>
+            </div>
 
-              <select 
-                value={batchStatTeamId} 
-                onChange={e => setBatchStatTeamId(e.target.value)} 
-                className="w-full bg-black p-2 rounded text-white border border-zinc-800 font-bold"
+            <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">บันทึก Team</button>
+          </form>
+        )}
+
+        <input
+          type="text"
+          placeholder="🔍 ค้นหาชื่อทีมหรือ TAG..."
+          value={teamSearchQuery}
+          onChange={(e) => setTeamSearchQuery(e.target.value)}
+          className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
+        />
+
+        <div className="space-y-5">
+          {rankedTeams.length === 0 ? (
+            <div className="bg-zinc-900/40 p-10 rounded-3xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Team</div>
+          ) : (
+            rankedTeams.map((t) => (
+              <div 
+                key={t.id} 
+                onClick={() => { setSelectedTeam(t); setTeamModalDetailTab('roster'); }} 
+                className="p-7 rounded-3xl border-2 border-zinc-800 relative overflow-hidden cursor-pointer transition shadow-2xl group hover:border-sky-500 bg-zinc-950"
               >
-                <option value="">-- เลือก Team เพื่อกรอกสถิติผู้เล่น --</option>
-                {teams.map(t => (
-                  <option key={t.id} value={t.id}>[{t.tag}] {t.name} ({players.filter(p => String(p.team_id) === String(t.id)).length} คน)</option>
-                ))}
-              </select>
+                {t.logo_url && (
+                  <div 
+                    className="absolute inset-0 bg-no-repeat bg-right bg-cover opacity-35 pointer-events-none filter blur-[1px] scale-125 transition duration-500 group-hover:scale-140" 
+                    style={{ backgroundImage: `url(${t.logo_url})` }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/20 pointer-events-none" />
 
-              {batchStatTeamId && (
-                <div className="space-y-2 pt-1 border-t border-zinc-800">
-                  {players.filter(p => String(p.team_id) === String(batchStatTeamId)).length === 0 ? (
-                    <p className="text-zinc-500 text-center py-2 italic">ยังไม่มีผู้เล่นในทีมนี้</p>
-                  ) : (
-                    players.filter(p => String(p.team_id) === String(batchStatTeamId)).map(p => {
-                      const pValues = batchPlayerValues[p.id] || { matches: '', kills: '', assists: '', damage: '', survived: '', rescue: '' };
-                      return (
-                        <div key={p.id} className="bg-black p-2 rounded-lg border border-zinc-800 space-y-1.5">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-white text-xs">🎯 {p.ign} <span className="text-[10px] text-sky-400">({p.role})</span></span>
-                          </div>
-                          <div className="grid grid-cols-6 gap-1">
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Match</label>
-                              <input 
-                                type="number" 
-                                placeholder="+M" 
-                                value={pValues.matches} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, matches: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Kill</label>
-                              <input 
-                                type="number" 
-                                placeholder="+K" 
-                                value={pValues.kills} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, kills: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Assist</label>
-                              <input 
-                                type="number" 
-                                placeholder="+A" 
-                                value={pValues.assists} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, assists: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Dmg</label>
-                              <input 
-                                type="number" 
-                                placeholder="+D" 
-                                value={pValues.damage} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, damage: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Surv</label>
-                              <input 
-                                type="number" 
-                                placeholder="+S" 
-                                value={pValues.survived} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, survived: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] text-zinc-500 block">Rescue</label>
-                              <input 
-                                type="number" 
-                                placeholder="+R" 
-                                value={pValues.rescue} 
-                                onChange={e => setBatchPlayerValues({...batchPlayerValues, [p.id]: {...pValues, rescue: e.target.value}})} 
-                                className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-xs" 
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
+                <div className="relative z-10 flex justify-between items-center py-2">
+                  <div className="flex items-center gap-6">
+                    {t.logo_url ? (
+                      <img src={t.logo_url} alt={t.name} onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `[${t.tag}] ${t.name}` }); }} className="w-24 h-24 object-contain rounded-2xl bg-zinc-950/80 p-2 border-2 border-zinc-700/80 shrink-0 group-hover:scale-110 transition cursor-pointer shadow-2xl" />
+                    ) : (
+                      <div className="w-24 h-24 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-center text-xs text-zinc-500 shrink-0">ไม่มีโลโก้</div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-black bg-sky-500/30 text-sky-300 px-3 py-1 rounded-xl border border-sky-500/50 shadow">[{t.tag}]</span>
+                      </div>
+                      <h3 className="font-black text-2xl text-white group-hover:text-sky-400 transition drop-shadow-xl">{t.name}</h3>
+                    </div>
+                  </div>
 
-                  {players.filter(p => String(p.team_id) === String(batchStatTeamId)).length > 0 && (
-                    <button type="submit" className="w-full bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold py-2 rounded border border-sky-500/30 mt-1">
-                      💾 บันทึกสถิติยกทีม ({batchTargetType === 'scrims' ? 'ห้องซ้อม' : 'ห้องแข่ง'})
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-100 group-hover:text-sky-400 font-extrabold transition bg-zinc-900/90 px-3.5 py-2.5 rounded-xl border border-zinc-700 shadow-lg">ดูข้อมูลทีม ➔</span>
+                    {isAdmin && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/20 text-red-400 p-3.5 rounded-xl border border-red-500/30 hover:bg-red-500/30 shadow-lg">🗑️</button>
+                    )}
+                  </div>
                 </div>
-              )}
-            </form>
+              </div>
+            ))
           )}
+        </div>
+      </main>
 
-          <div className="space-y-2.5">
-            {playerStatTab === 'scrims' ? (
-              rankedScrimPlayers.length === 0 ? (
-                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Player ที่ค้นหา</div>
-              ) : (
-                rankedScrimPlayers.map((p, idx) => {
-                  const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
-                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
-                  return (
-                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex flex-col gap-2 cursor-pointer transition ${
-                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
-                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
-                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
-                      'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    }`}>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
-                            isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
-                          }`}>{idx + 1}</span>
-                          <div className="flex items-center gap-3">
-                            {p.avatar_url && (
-                              <img 
-                                src={p.avatar_url} 
-                                alt={p.ign} 
-                                onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
-                                className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                                title="คลิกเพื่อดูรูปขนาดใหญ่"
-                              />
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-sm text-white">{p.ign}</span>
-                                <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
-                                {p.sub_role && <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400">รอง: {p.sub_role}</span>}
-                              </div>
-                              <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {isAdmin && (
-                          <div className="flex gap-1">
-                            <button onClick={(e) => { 
-                              e.stopPropagation(); 
-                              setEditingPlayer(p); 
-                              setEditIgn(p.ign); 
-                              setEditRole(p.role || 'ATK 1'); 
-                              setEditSubRole(p.sub_role || ''); 
-                              setEditPlayerAvatarUrl(p.avatar_url || ''); 
-                            }} className="text-xs bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1.5 rounded border border-sky-500/20" title="แก้ไข Player">✏️</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-6 gap-1 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800 text-center text-[10px]">
-                        <div><span className="text-zinc-500 block">Match</span><strong className="text-zinc-300">{p.total_matches || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Kill</span><strong className="text-sky-400">{p.total_kills || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Assist</span><strong className="text-sky-300">{p.Assists || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Dmg</span><strong className="text-sky-200">{p.Damage || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Survived</span><strong className="text-emerald-400">{p.Survived || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Rescue</span><strong className="text-amber-400">{p.Rescue || 0}</strong></div>
-                      </div>
-                    </div>
-                  );
-                })
-              )
-            ) : (
-              rankedTourneyPlayers.length === 0 ? (
-                <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Player ที่ค้นหา</div>
-              ) : (
-                rankedTourneyPlayers.map((p, idx) => {
-                  const teamInfo = teams.find(t => String(t.id) === String(p.team_id));
-                  const isTop1 = idx === 0; const isTop2 = idx === 1; const isTop3 = idx === 2;
-                  return (
-                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`p-3.5 rounded-xl border flex flex-col gap-2 cursor-pointer transition ${
-                      isTop1 ? 'bg-red-500/10 border-red-500/40 text-red-300' :
-                      isTop2 ? 'bg-orange-500/10 border-orange-500/40 text-orange-300' :
-                      isTop3 ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' :
-                      'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    }`}>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs ${
-                            isTop1 ? 'bg-red-500 text-white' : isTop2 ? 'bg-orange-500 text-white' : isTop3 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
-                          }`}>{idx + 1}</span>
-                          <div className="flex items-center gap-3">
-                            {p.avatar_url && (
-                              <img 
-                                src={p.avatar_url} 
-                                alt={p.ign} 
-                                onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
-                                className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                                title="คลิกเพื่อดูรูปขนาดใหญ่"
-                              />
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-sm text-white">{p.ign}</span>
-                                <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-sky-400">{p.role}</span>
-                                {p.sub_role && <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400">รอง: {p.sub_role}</span>}
-                              </div>
-                              <p className="text-[10px] text-zinc-400 mt-0.5">Team: <span className="text-sky-400 font-bold">{teamInfo ? `[${teamInfo.tag}] ${teamInfo.name}` : 'Free Agent'}</span></p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {isAdmin && (
-                          <div className="flex gap-1">
-                            <button onClick={(e) => { 
-                              e.stopPropagation(); 
-                              setEditingPlayer(p); 
-                              setEditIgn(p.ign); 
-                              setEditRole(p.role || 'ATK 1'); 
-                              setEditSubRole(p.sub_role || ''); 
-                              setEditPlayerAvatarUrl(p.avatar_url || ''); 
-                            }} className="text-xs bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1.5 rounded border border-sky-500/20" title="แก้ไข Player">✏️</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeletePlayer(p.id, p.ign); }} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 p-1.5 rounded border border-red-500/20" title="ลบ Player">🗑️</button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-6 gap-1 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800 text-center text-[10px]">
-                        <div><span className="text-zinc-500 block">Match</span><strong className="text-zinc-300">{p.tourney_matches || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Kill</span><strong className="text-sky-300">{p.tourney_kills || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Assist</span><strong className="text-sky-200">{p.tourney_assists || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Dmg</span><strong className="text-sky-100">{p.tourney_damage || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Survived</span><strong className="text-emerald-300">{p.tourney_survived || 0}</strong></div>
-                        <div><span className="text-zinc-500 block">Rescue</span><strong className="text-amber-300">{p.tourney_rescue || 0}</strong></div>
-                      </div>
-                    </div>
-                  );
-                })
-              )
-            )}
-          </div>
-        </main>
-      )}
-
-      {/* ================= TAB 3: MATCHES (SCRIM&TOUR) ================= */}
-      {activeTab === 'matches' && (
-        <main className="space-y-3 text-xs">
-          <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-            <button onClick={() => setMatchSubTab('scrims')} className={`py-1.5 font-bold rounded-lg transition ${matchSubTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 ห้องซ้อม</button>
-            <button onClick={() => setMatchSubTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${matchSubTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏆 ทัวร์</button>
-          </div>
-
-          {matchSubTab === 'scrims' && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <select value={selectedScrimTournament} onChange={e => setSelectedScrimTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
-                  {scrimTournaments.length === 0 ? <option value="">-- ยังไม่มีห้องซ้อม --</option> : scrimTournaments.map(st => <option key={st.id} value={st.id}>🏠 {st.name} ({st.scrim_date}) - {st.total_matches || 5} เกม</option>)}
-                </select>
-                {isAdmin && selectedScrimTournament && (
-                  <button onClick={() => handleDeleteScrim(selectedScrimTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบห้องซ้อมนี้">🗑️ ลบ</button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => setShowScrimForm(!showScrimForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
-                )}
-              </div>
-
-              {isAdmin && showScrimForm && (
-                <form onSubmit={handleAddScrim} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
-                  <input type="text" placeholder="ชื่อห้องซ้อม" value={scrimName} onChange={e => setScrimName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="date" value={scrimDate} onChange={e => setScrimDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                    <input type="number" placeholder="จำนวนเกม (เช่น 5)" value={scrimMatches} onChange={e => setScrimMatches(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800 text-center" />
-                  </div>
-                  <input type="text" placeholder="ลิงก์รูปตารางคะแนนห้องซ้อม (Image URL)" value={scrimImageUrl} onChange={e => setScrimImageUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างห้องซ้อม</button>
-                </form>
-              )}
-
-              {isAdmin && selectedScrimTournament && (
-                <form onSubmit={handleAddScrimScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <p className="font-bold text-zinc-300">➕ กรอกแต้มห้องซ้อม Team</p>
-                  <select value={selectedScrimTeamId} onChange={e => setSelectedScrimTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="">-- เลือก Team --</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
-                  </select>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="number" placeholder="Kill Pts" value={scrimKillPts} onChange={e => setScrimKillPts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-                    <input type="number" placeholder="Place Pts" value={scrimPlacePts} onChange={e => setScrimPlacePts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-                  </div>
-                  <button type="submit" className="w-full bg-zinc-800 text-sky-400 border border-sky-500/30 font-bold py-1.5 rounded">บันทึกแต้ม Team</button>
-                </form>
-              )}
-
-              <div className="space-y-2 pt-2">
-                <h3 className="font-bold text-zinc-300">📅 ประวัติห้องซ้อม (คลิกเพื่อดูรายละเอียด)</h3>
-                {scrimTournaments.length === 0 ? (
-                  <div className="bg-zinc-900/40 p-4 rounded-xl border border-zinc-800 text-center text-zinc-500">ยังไม่มีประวัติการสร้างห้องซ้อม</div>
-                ) : (
-                  scrimTournaments.map(st => {
-                    const thisScrimScores = allScrimScores.filter(s => String(s.scrim_tournament_id) === String(st.id));
-                    return (
-                      <div key={st.id} onClick={() => setSelectedScrimDetail(st)} className="bg-zinc-900 hover:bg-zinc-850 p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer transition shadow-sm group">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-sky-400">🏠 {st.name}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{st.scrim_date} ({st.total_matches || 5} เกม)</span>
-                          </div>
-                          <p className="text-[10px] text-zinc-400 mt-0.5">จำนวน Team ที่ลงแข่ง: <strong className="text-sky-400">{thisScrimScores.length} Team</strong> {st.image_url && <span className="text-sky-300 ml-1">📸 [มีรูปตาราง]</span>}</p>
-                        </div>
-                        <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
-          {matchSubTab === 'tournaments' && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="flex-1 bg-zinc-900 p-2 rounded text-sky-400 font-bold border border-zinc-800">
-                  {tournaments.length === 0 ? <option value="">-- ยังไม่มีทัวร์นาเมนต์ --</option> : tournaments.map(tr => <option key={tr.id} value={tr.id}>🏆 {tr.name} ({tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : ''}) {tr.prize_pool ? `💰 ${tr.prize_pool}` : ''}</option>)}
-                </select>
-                {isAdmin && selectedTournament && (
-                  <button onClick={() => handleDeleteTournament(selectedTournament)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-2.5 py-2 rounded border border-red-500/30" title="ลบทัวร์นาเมนต์นี้">🗑️ ลบ</button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => setShowTourneyForm(!showTourneyForm)} className="bg-sky-500 text-black font-bold px-2.5 py-2 rounded">+ สร้าง</button>
-                )}
-              </div>
-
-              {isAdmin && showTourneyForm && (
-                <form onSubmit={handleAddTournament} className="bg-zinc-900 p-3 rounded-xl border border-sky-500/30 space-y-2">
-                  <input type="text" placeholder="ชื่อทัวร์นาเมนต์" value={tourneyName} onChange={e => setTourneyName(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-zinc-400 block mb-1">วันที่แข่งขัน</label>
-                      <input type="date" value={tourneyDate} onChange={e => setTourneyDate(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-zinc-400 block mb-1">เงินรางวัล (Prize Pool)</label>
-                      <input type="text" placeholder="เช่น 5,000 บาท" value={tourneyPrize} onChange={e => setTourneyPrize(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                    </div>
-                  </div>
-                  <input type="text" placeholder="ลิงก์รูปตารางคะแนนทัวร์ (Image URL)" value={tourneyImageUrl} onChange={e => setTourneyImageUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-                  <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1.5 rounded">สร้างทัวร์</button>
-                </form>
-              )}
-
-              {isAdmin && selectedTournament && (
-                <form onSubmit={handleAddScore} className="bg-zinc-900 p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <p className="font-bold text-zinc-300">➕ กรอกแต้มทัวร์นาเมนต์ Team</p>
-                  <select value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="">-- เลือก Team --</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>[{t.tag}] {t.name}</option>)}
-                  </select>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="number" placeholder="Kill Pts" value={killPts} onChange={e => setKillPts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-                    <input type="number" placeholder="Place Pts" value={placePts} onChange={e => setPlacePts(e.target.value)} className="bg-black p-2 rounded text-white border border-zinc-800" />
-                  </div>
-                  <button type="submit" className="w-full bg-zinc-800 text-sky-400 border border-sky-500/30 font-bold py-1.5 rounded">บันทึกแต้ม Team</button>
-                </form>
-              )}
-
-              <div className="space-y-2 pt-2">
-                <h3 className="font-bold text-zinc-300">🏆 ประวัติทัวร์นาเมนต์ (คลิกเพื่อดูรายละเอียด)</h3>
-                {tournaments.length === 0 ? (
-                  <div className="bg-zinc-900/40 p-4 rounded-xl border border-zinc-800 text-center text-zinc-500">ยังไม่มีประวัติการสร้างทัวร์นาเมนต์</div>
-                ) : (
-                  tournaments.map(tr => {
-                    const thisTourneyScores = allScores.filter(s => String(s.tournament_id) === String(tr.id));
-                    const trDateStr = tr.created_at ? new Date(tr.created_at).toISOString().split('T')[0] : '';
-                    return (
-                      <div key={tr.id} onClick={() => setSelectedTourneyDetail(tr)} className="bg-zinc-900 hover:bg-zinc-850 p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer transition shadow-sm group">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-sky-400">🏆 {tr.name}</span>
-                            <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">{trDateStr}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-[10px] text-zinc-400">จำนวน Team: <strong className="text-sky-400">{thisTourneyScores.length}</strong></p>
-                            {tr.prize_pool && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-bold">💰 {tr.prize_pool}</span>}
-                            {tr.image_url && <span className="text-[10px] text-sky-300">📸 [มีรูปตาราง]</span>}
-                          </div>
-                        </div>
-                        <span className="text-xs bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 font-bold px-2.5 py-1 rounded border border-sky-500/20">🔍 ดูคะแนน</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-        </main>
-      )}
-
-      {/* ================= TAB 4: IMAGE VAULT (คลังรูปภาพเฉพาะแอดมิน) ================= */}
-      {isAdmin && activeTab === 'vault' && (
-        <main className="space-y-4 text-xs">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xs font-bold text-sky-400">📁 คลังเก็บรูปภาพส่วนกลาง (Image Vault)</h2>
-              <p className="text-[10px] text-zinc-400 mt-0.5">อัปโหลดรูปแล้วกด &apos;คัดลอกลิงก์&apos; ไปวางใช้งานได้เลย รูปไม่มีวันหาย!</p>
-            </div>
-          </div>
-
-          <div className="bg-zinc-900 p-4 rounded-xl border border-sky-500/30 text-center space-y-3">
-            <label className="block font-bold text-zinc-200">➕ อัปโหลดรูปภาพใหม่เข้าคลัง</label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleUploadToVault} 
-              disabled={uploadingImage}
-              className="w-full bg-black p-2 rounded text-zinc-300 border border-zinc-800 text-xs file:mr-4 file:py-1 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-black hover:file:bg-sky-400 cursor-pointer" 
-            />
-            {uploadingImage && <p className="text-sky-400 animate-pulse text-[11px]">กำลังอัปโหลดรูปภาพ...</p>}
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="font-bold text-zinc-300">🖼️ รายการรูปภาพทั้งหมดในคลัง ({vaultFiles.length}):</h3>
-            {vaultFiles.length === 0 ? (
-              <div className="bg-zinc-900/40 p-8 rounded-xl border border-zinc-800 text-center text-zinc-500">
-                ยังไม่มีรูปภาพในคลัง ลองอัปโหลดรูปแรกกันเลย!
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {vaultFiles.map((file) => (
-                  <div key={file.name} className="bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 flex flex-col gap-2 shadow-sm">
-                    <img 
-                      src={file.publicUrl} 
-                      alt={file.name} 
-                      onClick={() => setPreviewImage({ url: file.publicUrl, title: file.name })}
-                      className="w-full h-28 object-cover rounded-lg bg-black cursor-pointer hover:opacity-90 transition border border-zinc-800"
-                      title="คลิกเพื่อดูรูปขนาดใหญ่"
-                    />
-                    <div className="space-y-1">
-                      <p className="text-[9px] text-zinc-400 truncate" title={file.name}>{file.name}</p>
-                      <div className="flex gap-1">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(file.publicUrl);
-                            alert('คัดลอกลิงก์รูปสำเร็จ!');
-                          }} 
-                          className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px] transition"
-                        >
-                          📋 คัดลอกลิงก์
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteVaultFile(file.name)} 
-                          className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded text-[10px] border border-red-500/30 transition"
-                          title="ลบรูป"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </main>
-      )}
-
-      {/* MODAL: TEAM DETAILS */}
+      {/* ================= MODAL: TEAM DETAILS ================= */}
       {selectedTeam && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div className="flex items-center gap-3">
                 {selectedTeam.logo_url && (
-                  <img 
-                    src={selectedTeam.logo_url} 
-                    alt={selectedTeam.name} 
-                    onClick={() => setPreviewImage({ url: selectedTeam.logo_url, title: `โลโก้ทีม: [${selectedTeam.tag}] ${selectedTeam.name}` })}
-                    className="w-10 h-10 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                    title="คลิกเพื่อดูรูปขนาดใหญ่"
-                  />
+                  <img src={selectedTeam.logo_url} alt={selectedTeam.name} onClick={() => setPreviewImage({ url: selectedTeam.logo_url, title: `[${selectedTeam.tag}] ${selectedTeam.name}` })} className="w-12 h-12 object-contain rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 cursor-pointer" />
                 )}
                 <div>
-                  <h3 className="font-bold text-sky-400 text-sm">[{selectedTeam.tag}] {selectedTeam.name}</h3>
-                  <p className="text-[10px] text-zinc-400">แต้มซ้อมรวม: <strong className="text-sky-400">{selectedTeam.totalScrimPts}</strong> | แต้มทัวร์รวม: <strong className="text-sky-300">{selectedTeam.totalTourneyPts}</strong></p>
+                  <h3 className="font-black text-sky-400 text-lg leading-tight">[{selectedTeam.tag}] {selectedTeam.name}</h3>
                 </div>
               </div>
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
 
-            {isAdmin && (
-              <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
-                <label className="text-[10px] text-sky-400 font-bold uppercase block">✨ สร้าง Player ใหม่เข้า Team นี้</label>
-                <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
-                <input type="text" placeholder="ลิงก์รูปผู้เล่น (Avatar URL)" value={newTeamPlayerAvatar} onChange={e => setNewTeamPlayerAvatar(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white mb-1 border border-zinc-800" />
-                <div className="grid grid-cols-2 gap-1 mb-2">
-                  <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
-                  <select value={newTeamPlayerSubRole} onChange={e => setNewTeamPlayerSubRole(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[11px]">
-                    <option value="">-- ไม่มีตำแหน่งรอง --</option>
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
+            <div className="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-[10px]">
+              <button onClick={() => setTeamModalDetailTab('roster')} className={`py-1.5 font-bold rounded transition ${teamModalDetailTab === 'roster' ? 'bg-sky-500 text-black' : 'text-zinc-400'}`}>ผู้เล่น ({selectedTeam.roster.length})</button>
+              <button onClick={() => setTeamModalDetailTab('overview')} className={`py-1.5 font-bold rounded transition ${teamModalDetailTab === 'overview' ? 'bg-sky-500 text-black' : 'text-zinc-400'}`}>สรุป</button>
+              <button onClick={() => setTeamModalDetailTab('scrims')} className={`py-1.5 font-bold rounded transition ${teamModalDetailTab === 'scrims' ? 'bg-sky-500 text-black' : 'text-zinc-400'}`}>ประวัติซ้อม</button>
+              <button onClick={() => setTeamModalDetailTab('tournaments')} className={`py-1.5 font-bold rounded transition ${teamModalDetailTab === 'tournaments' ? 'bg-sky-500 text-black' : 'text-zinc-400'}`}>ประวัติทัวร์</button>
+            </div>
+
+            {teamModalDetailTab === 'overview' && (
+              <div className="space-y-3 pt-1">
+                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-3">
+                  <p className="text-zinc-300 font-bold">📊 สรุปคะแนน (แยกประเภท, แต้มคิล, แต้มอันดับ และจำนวนเกม):</p>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    {/* สรุปห้องซ้อม */}
+                    <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-900 space-y-1.5">
+                      <span className="text-[10px] text-sky-400 font-bold block">🏠 ห้องซ้อมรวม</span>
+                      <div className="text-base font-black text-white">{selectedTeam.totalScrimPts} แต้ม</div>
+                      <div className="grid grid-cols-2 gap-1 text-[9px] bg-black p-1.5 rounded border border-zinc-900">
+                        <div>
+                          <span className="text-zinc-400 block">คิลรวม</span>
+                          <strong className="text-sky-400">{selectedTeam.totalScrimKillPts}</strong>
+                        </div>
+                        <div>
+                          <span className="text-zinc-400 block">อันดับรวม</span>
+                          <strong className="text-white">{selectedTeam.totalScrimPlacePts}</strong>
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-zinc-400">จำนวนเกม: <strong className="text-white">{selectedTeam.totalScrimMatches} เกม</strong></div>
+                      <div className="border-t border-zinc-900 pt-1">
+                        <span className="text-[8px] text-zinc-500 block">เฉลี่ยต่อเกม (AVG)</span>
+                        <strong className="text-sm text-emerald-400">{selectedTeam.avgScrimPts}</strong>
+                      </div>
+                    </div>
+
+                    {/* สรุปทัวร์นาเมนต์ */}
+                    <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-900 space-y-1.5">
+                      <span className="text-[10px] text-amber-300 font-bold block">🏆 ทัวร์นาเมนต์รวม</span>
+                      <div className="text-base font-black text-white">{selectedTeam.totalTourneyPts} แต้ม</div>
+                      <div className="grid grid-cols-2 gap-1 text-[9px] bg-black p-1.5 rounded border border-zinc-900">
+                        <div>
+                          <span className="text-zinc-400 block">คิลรวม</span>
+                          <strong className="text-amber-300">{selectedTeam.totalTourneyKillPts}</strong>
+                        </div>
+                        <div>
+                          <span className="text-zinc-400 block">อันดับรวม</span>
+                          <strong className="text-white">{selectedTeam.totalTourneyPlacePts}</strong>
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-zinc-400">จำนวนเกม: <strong className="text-white">{selectedTeam.totalTourneyMatches} เกม</strong></div>
+                      <div className="border-t border-zinc-900 pt-1">
+                        <span className="text-[8px] text-zinc-500 block">เฉลี่ยต่อเกม (AVG)</span>
+                        <strong className="text-sm text-amber-400">{selectedTeam.avgTourneyPts}</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ เพิ่ม Player ใหม่</button>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-              <button 
-                onClick={() => setTeamModalStatTab('scrims')} 
-                className={`py-1.5 font-bold rounded-lg transition text-[11px] ${teamModalStatTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400 hover:text-white'}`}
-              >
-                🏠 สถิติซ้อม
-              </button>
-              <button 
-                onClick={() => setTeamModalStatTab('tournaments')} 
-                className={`py-1.5 font-bold rounded-lg transition text-[11px] ${teamModalStatTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400 hover:text-white'}`}
-              >
-                🏆 สถิติแข่ง
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-              <button 
-                onClick={() => setTeamViewMode('total')} 
-                className={`py-1 font-bold rounded transition text-[10px] ${teamViewMode === 'total' ? 'bg-zinc-800 text-sky-400 border border-sky-500/30' : 'text-zinc-400 hover:text-white'}`}
-              >
-                📊 แสดงยอดรวม (Total)
-              </button>
-              <button 
-                onClick={() => setTeamViewMode('average')} 
-                className={`py-1 font-bold rounded transition text-[10px] ${teamViewMode === 'average' ? 'bg-zinc-800 text-sky-400 border border-sky-500/30' : 'text-zinc-400 hover:text-white'}`}
-              >
-                📈 ค่าเฉลี่ย (Per Match)
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-zinc-300 font-bold">👥 Player ใน Team ({selectedTeam.roster.length}):</p>
-              {selectedTeam.roster.length === 0 ? (
-                <p className="text-zinc-500 italic text-center py-2">ยังไม่มี Player ใน Team นี้</p>
-              ) : (
-                selectedTeam.roster.map((p: any) => {
-                  const sMatch = p.total_matches || 0;
-                  const sDiv = sMatch > 0 ? sMatch : 1;
-
-                  const sM = sMatch;
-                  const sK = teamViewMode === 'total' ? (p.total_kills || 0) : Number((p.total_kills / sDiv).toFixed(1));
-                  const sA = teamViewMode === 'total' ? (p.Assists || 0) : Number((p.Assists / sDiv).toFixed(1));
-                  const sD = teamViewMode === 'total' ? (p.Damage || 0) : Number((p.Damage / sDiv).toFixed(1));
-                  const sS = teamViewMode === 'total' ? (p.Survived || 0) : Number((p.Survived / sDiv).toFixed(1));
-                  const sR = teamViewMode === 'total' ? (p.Rescue || 0) : Number((p.Rescue / sDiv).toFixed(1));
-
-                  const tMatch = p.tourney_matches || 0;
-                  const tDiv = tMatch > 0 ? tMatch : 1;
-
-                  const tM = tMatch;
-                  const tK = teamViewMode === 'total' ? (p.tourney_kills || 0) : Number((p.tourney_kills / tDiv).toFixed(1));
-                  const tA = teamViewMode === 'total' ? (p.tourney_assists || 0) : Number((p.tourney_assists / tDiv).toFixed(1));
-                  const tD = teamViewMode === 'total' ? (p.tourney_damage || 0) : Number((p.tourney_damage / tDiv).toFixed(1));
-                  const tS = teamViewMode === 'total' ? (p.tourney_survived || 0) : Number((p.tourney_survived / tDiv).toFixed(1));
-                  const tR = teamViewMode === 'total' ? (p.tourney_rescue || 0) : Number((p.tourney_rescue / tDiv).toFixed(1));
-
-                  return (
-                    <div 
-                      key={p.id} 
-                      onClick={() => setSelectedPlayer(p)} 
-                      className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5 cursor-pointer hover:border-sky-500/50 transition group"
-                      title="คลิกเพื่อดูโปรไฟล์และพลังแฝงผู้เล่น"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2.5">
-                          {p.avatar_url && (
-                            <img 
-                              src={p.avatar_url} 
-                              alt={p.ign} 
-                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: p.avatar_url, title: `รูปผู้เล่น: ${p.ign}` }); }}
-                              className="w-10 h-10 object-cover rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 shrink-0 hover:scale-110 hover:border-sky-400 transition cursor-pointer" 
-                              title="คลิกเพื่อดูรูปขนาดใหญ่"
-                            />
-                          )}
-                          <div>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-white font-bold text-sm group-hover:text-sky-400 transition">{p.ign}</span>
-                              <span className="text-[10px] text-sky-400 bg-zinc-900 px-1.5 py-0.5 rounded">{p.role}</span>
-                              {p.sub_role && <span className="text-[10px] text-zinc-400 bg-zinc-900 px-1.5 py-0.5 rounded">รอง: {p.sub_role}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        {isAdmin ? (
-                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => { 
-                              setEditingPlayer(p); 
-                              setEditIgn(p.ign); 
-                              setEditRole(p.role || 'ATK 1'); 
-                              setEditSubRole(p.sub_role || ''); 
-                              setEditPlayerAvatarUrl(p.avatar_url || ''); 
-                            }} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">แก้ไข</button>
-                            <button onClick={() => handleResetPlayerStats(p.id, p.ign)} className="text-[10px] bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">ล้างแต้ม</button>
-                            <button onClick={() => handleRemovePlayerFromTeam(p.id)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20">ปลดออก</button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-sky-400 font-bold opacity-0 group-hover:opacity-100 transition">🔍 ดูโปรไฟล์</span>
-                        )}
+            {teamModalDetailTab === 'scrims' && (
+              <div className="space-y-3 pt-1">
+                {isAdmin && (
+                  <div className="bg-black p-2.5 rounded-lg border border-sky-500/40 space-y-2">
+                    <p className="text-[10px] text-sky-400 font-bold">➕ เพิ่มคะแนนห้องซ้อมให้ทีมนี้</p>
+                    <input 
+                      type="text" 
+                      placeholder="พิมพ์ชื่อห้องซ้อม (เช่น Room วันนี้ Match 1)" 
+                      value={scrimNameInput} 
+                      onChange={e => setScrimNameInput(e.target.value)} 
+                      className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" 
+                    />
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">แต้มคิล</span>
+                        <input type="number" value={scrimKillPts} onChange={e => setScrimKillPts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
-
-                      <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                        {teamModalStatTab === 'scrims' ? (
-                          teamViewMode === 'total' ? (
-                            <div className="grid grid-cols-6 gap-1 text-center text-[10px]">
-                              <div><span className="text-zinc-500 block text-[8px]">Match</span><strong className="text-zinc-300">{sM}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Kill</span><strong className="text-sky-400">{sK}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Assist</span><strong className="text-sky-300">{sA}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Dmg</span><strong className="text-sky-200">{sD}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Survived</span><strong className="text-emerald-400">{sS}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Rescue</span><strong className="text-amber-400">{sR}</strong></div>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-5 gap-1 text-center text-[10px]">
-                              <div><span className="text-zinc-500 block text-[8px]">Kill/M</span><strong className="text-sky-400">{sK}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Assist/M</span><strong className="text-sky-300">{sA}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Dmg/M</span><strong className="text-sky-200">{sD}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Surv/M</span><strong className="text-emerald-400">{sS}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Rescue/M</span><strong className="text-amber-400">{sR}</strong></div>
-                            </div>
-                          )
-                        ) : (
-                          teamViewMode === 'total' ? (
-                            <div className="grid grid-cols-6 gap-1 text-center text-[10px]">
-                              <div><span className="text-zinc-500 block text-[8px]">Match</span><strong className="text-zinc-300">{tM}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Kill</span><strong className="text-sky-300">{tK}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Assist</span><strong className="text-sky-200">{tA}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Dmg</span><strong className="text-sky-100">{tD}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Survived</span><strong className="text-emerald-300">{tS}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Rescue</span><strong className="text-amber-300">{tR}</strong></div>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-5 gap-1 text-center text-[10px]">
-                              <div><span className="text-zinc-500 block text-[8px]">Kill/M</span><strong className="text-sky-300">{tK}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Assist/M</span><strong className="text-sky-200">{tA}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Dmg/M</span><strong className="text-sky-100">{tD}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Surv/M</span><strong className="text-emerald-300">{tS}</strong></div>
-                              <div><span className="text-zinc-500 block text-[8px]">Rescue/M</span><strong className="text-amber-300">{tR}</strong></div>
-                            </div>
-                          )
-                        )}
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">แต้มอันดับ</span>
+                        <input type="number" value={scrimPlacePts} onChange={e => setScrimPlacePts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">จำนวนเกม</span>
+                        <input type="number" min="1" value={scrimMatchesInput} onChange={e => setScrimMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <button onClick={() => handleAddScrimScore(selectedTeam.id)} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนซ้อม</button>
+                  </div>
+                )}
 
-            <div className="border-t border-zinc-800 pt-3 space-y-3">
-              <p className="text-zinc-300 font-bold">📜 ประวัติการลงห้องซ้อมและแข่งของทีม:</p>
-              
-              <div className="space-y-2">
-                <p className="text-[11px] text-sky-400 font-bold">🏠 ห้องซ้อมที่เคยลง ({selectedTeam.scrimHistory.length}):</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-sky-400 font-bold">🏠 ประวัติการลงห้องซ้อม:</p>
+                  <span className="text-[11px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded font-bold border border-sky-500/30">
+                    บันทึกแล้ว: {selectedTeam.scrimHistory.length} ครั้ง
+                  </span>
+                </div>
+
                 {selectedTeam.scrimHistory.length === 0 ? (
-                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติห้องซ้อม</p>
+                  <p className="text-zinc-500 italic text-center py-4">ยังไม่มีประวัติห้องซ้อม</p>
                 ) : (
-                  selectedTeam.scrimHistory.map((sItem: any) => {
-                    const stInfo = scrimTournaments.find(st => String(st.id) === String(sItem.scrim_tournament_id));
-                    const totalS = (sItem.kill_points || 0) + (sItem.placement_points || 0);
-                    return (
-                      <div key={sItem.id} className="bg-black p-2 rounded border border-zinc-800 flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-300">🏠 {stInfo?.name || 'ห้องซ้อม'} ({stInfo?.scrim_date || ''})</span>
-                        <span className="font-black text-sky-400">{totalS} แต้ม (K:{sItem.kill_points} P:{sItem.placement_points})</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                  selectedTeam.scrimHistory.map((s: any, index: number) => {
+                    const sessionHistories = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
+                    const entryCount = sessionHistories.length;
+                    const matchesCount = Number(s.matches) || 5;
+                    const totalPts = (s.kill_points || 0) + (s.placement_points || 0);
+                    const avgPerMatch = (totalPts / matchesCount).toFixed(2);
 
-              <div className="space-y-2 pt-1">
-                <p className="text-[11px] text-sky-300 font-bold">🏆 ทัวร์นาเมนต์ที่เคยลง ({selectedTeam.tourneyHistory.length}):</p>
-                {selectedTeam.tourneyHistory.length === 0 ? (
-                  <p className="text-zinc-500 italic text-[11px]">ยังไม่มีประวัติทัวร์นาเมนต์</p>
-                ) : (
-                  selectedTeam.tourneyHistory.map((tItem: any) => {
-                    const trInfo = tournaments.find(tr => String(tr.id) === String(tItem.tournament_id));
-                    const totalT = (tItem.kill_points || 0) + (tItem.placement_points || 0);
-                    const trDate = trInfo?.created_at ? new Date(trInfo.created_at).toISOString().split('T')[0] : '';
                     return (
-                      <div key={tItem.id} className="bg-black p-2 rounded border border-zinc-800 flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-300">🏆 {trInfo?.name || 'ทัวร์นาเมนต์'} ({trDate})</span>
-                        <span className="font-black text-sky-300">{totalT} แต้ม (K:{tItem.kill_points} P:{tItem.placement_points})</span>
+                      <div 
+                        key={s.id} 
+                        onClick={() => { setActiveHistoryScrim(s); setShowHistoryModal(true); }}
+                        className="bg-black p-3 rounded-xl border border-zinc-800 hover:border-sky-500 cursor-pointer space-y-2 text-[10px] transition shadow"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-white font-bold flex items-center gap-1.5 text-xs">
+                            #️⃣{index + 1} 🏠 {s.scrim_name || 'ห้องซ้อม'}
+                            {entryCount > 0 && <span className="text-emerald-400" title="กรอกแล้ว">✅</span>}
+                          </span>
+                          <span className="font-black text-sky-400">{totalPts} แต้ม (AVG: {avgPerMatch})</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-zinc-900 text-[9px] text-zinc-400">
+                          <span>คิล: <strong className="text-sky-400">{s.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{s.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong></span>
+                          <span>กรอกผู้เล่น: <strong className={entryCount >= 6 ? 'text-red-400' : 'text-emerald-400'}>{entryCount}/6 ครั้ง</strong></span>
+                        </div>
                       </div>
                     );
                   })
                 )}
               </div>
-            </div>
+            )}
+
+            {teamModalDetailTab === 'tournaments' && (
+              <div className="space-y-3 pt-1">
+                {isAdmin && (
+                  <div className="bg-black p-2.5 rounded-lg border border-amber-500/40 space-y-2">
+                    <p className="text-[10px] text-amber-300 font-bold">➕ เพิ่มคะแนนทัวร์นาเมนต์ให้ทีมนี้</p>
+                    <input 
+                      type="text" 
+                      placeholder="พิมพ์ชื่อทัวร์นาเมนต์ (เช่น Pro League Final)" 
+                      value={tourneyNameInput} 
+                      onChange={e => setTourneyNameInput(e.target.value)} 
+                      className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" 
+                    />
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">แต้มคิล</span>
+                        <input type="number" value={tourneyKillPts} onChange={e => setTourneyKillPts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">แต้มอันดับ</span>
+                        <input type="number" value={tourneyPlacePts} onChange={e => setTourneyPlacePts(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-zinc-400 block">จำนวนเกม</span>
+                        <input type="number" min="1" value={tourneyMatchesInput} onChange={e => setTourneyMatchesInput(Number(e.target.value))} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center text-[10px]" />
+                      </div>
+                    </div>
+                    <button onClick={() => handleAddTourneyScore(selectedTeam.id)} className="w-full bg-amber-400 hover:bg-amber-300 text-black font-bold py-1 rounded text-[10px]">💾 บันทึกคะแนนทัวร์</button>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <p className="text-amber-300 font-bold">🏆 ประวัติการลงทัวร์นาเมนต์:</p>
+                  <span className="text-[11px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-500/30">
+                    บันทึกแล้ว: {selectedTeam.tourneyHistory.length} ครั้ง
+                  </span>
+                </div>
+
+                {selectedTeam.tourneyHistory.length === 0 ? (
+                  <p className="text-zinc-500 italic text-center py-4">ยังไม่มีประวัติทัวร์นาเมนต์</p>
+                ) : (
+                  selectedTeam.tourneyHistory.map((t: any, index: number) => {
+                    const matchesCount = Number(t.matches) || 5;
+                    const totalPts = (t.kill_points || 0) + (t.placement_points || 0);
+                    const avgPerMatch = (totalPts / matchesCount).toFixed(2);
+
+                    return (
+                      <div key={t.id} className="bg-black p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-[10px]">
+                        <div>
+                          <span className="text-zinc-300 block font-bold">#️⃣{index + 1} 🏆 {t.tournament_name || 'ทัวร์นาเมนต์'}</span>
+                          <span className="text-[9px] text-zinc-400">คิล: <strong className="text-amber-300">{t.kill_points || 0}</strong> | อันดับ: <strong className="text-white">{t.placement_points || 0}</strong> | เกม: <strong className="text-white">{matchesCount}</strong></span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-amber-300 text-xs block">{totalPts} แต้ม</span>
+                          <span className="text-[9px] text-zinc-400">AVG: <strong className="text-amber-400">{avgPerMatch}</strong></span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {teamModalDetailTab === 'roster' && (
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center">
+                  <p className="text-zinc-300 font-bold">👥 Player ใน Team ({selectedTeam.roster.length}):</p>
+                  {isAdmin && selectedTeam.scrimHistory.length > 0 && selectedTeam.roster.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setSelectedScrimSessionId(selectedTeam.scrimHistory[selectedTeam.scrimHistory.length - 1]?.id || '');
+                        const initialScores: any = {};
+                        selectedTeam.roster.forEach((p: any) => {
+                          initialScores[p.id] = {
+                            matches: p.total_matches || 0,
+                            kills: p.total_kills || 0,
+                            assists: p.Assists || 0,
+                            damage: p.Damage || 0,
+                            survived: p.Survived || 0,
+                            rescue: p.Rescue || 0
+                          };
+                        });
+                        setBatchPlayerScores(initialScores);
+                        setShowBatchScoreModal(true);
+                      }} 
+                      className="bg-sky-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow"
+                    >
+                      ✏️️ กรอกคะแนนผู้เล่นทั้งทีม
+                    </button>
+                  )}
+                </div>
+
+                {isAdmin && (
+                  <div className="bg-black p-2.5 rounded-lg border border-zinc-800 space-y-1.5 mb-2">
+                    <label className="text-[9px] text-sky-400 font-bold block">✨ เพิ่ม Player ใหม่เข้า Team นี้</label>
+                    <input type="text" placeholder="ชื่อ IGN" value={newTeamPlayerIgn} onChange={e => setNewTeamPlayerIgn(e.target.value)} className="w-full bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" />
+                    
+                    <div className="space-y-1">
+                      <div className="flex gap-1">
+                        <input type="text" placeholder="รูปผู้เล่น (URL หรืออัปโหลด)" value={newTeamPlayerAvatar} onChange={e => setNewTeamPlayerAvatar(e.target.value)} className="flex-1 bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]" />
+                        <label className="bg-zinc-800 hover:bg-zinc-700 text-sky-400 font-bold px-2 py-1 rounded text-[10px] cursor-pointer flex items-center justify-center border border-sky-500/30">
+                          📁 อัปโหลด
+                          <input type="file" accept="image/*" onChange={(e) => handleDirectImageUpload(e, setNewTeamPlayerAvatar)} className="hidden" />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1">
+                      <select value={newTeamPlayerRole} onChange={e => setNewTeamPlayerRole(e.target.value)} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-[10px]">
+                        <option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                      </select>
+                      <select value={newTeamPlayerSubRole} onChange={e => setNewTeamPlayerSubRole(e.target.value)} className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-[10px]">
+                        <option value="">-- รอง --</option><option value="ATK 1">ATK 1</option><option value="ATK 2">ATK 2</option><option value="IGL">IGL</option><option value="Scout">Scout</option><option value="Flex">Flex</option>
+                      </select>
+                    </div>
+                    <button onClick={() => handleCreatePlayerForTeam(selectedTeam.id)} className="w-full bg-sky-500/25 border border-sky-500/40 text-sky-300 font-bold py-1 rounded">＋ บันทึกผู้เล่นเข้าทีม</button>
+                  </div>
+                )}
+
+                {selectedTeam.scrimHistory.length === 0 && isAdmin && (
+                  <p className="text-[10px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/30 text-center">
+                    ⚠️ ต้องบันทึกคะแนนห้องซ้อมอย่างน้อย 1 ครั้งก่อน จึงจะสามารถกรอกคะแนนผู้เล่นได้
+                  </p>
+                )}
+
+                {selectedTeam.roster.length === 0 ? (
+                  <p className="text-zinc-500 italic text-center py-2">ยังไม่มี Player ใน Team นี้</p>
+                ) : (
+                  selectedTeam.roster.map((p: any) => {
+                    const isGraded = Boolean(p.last_scrim_session_id);
+                    return (
+                      <div 
+                        key={p.id} 
+                        className="bg-black p-3 rounded-xl border border-zinc-800 flex justify-between items-center cursor-pointer hover:border-sky-500 transition" 
+                        onClick={() => setSelectedPlayer(p)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {p.avatar_url && <img src={p.avatar_url} alt={p.ign} className="w-9 h-9 object-cover rounded-lg bg-zinc-950 border border-zinc-800" />}
+                          <div>
+                            <span className="text-white font-black text-sm flex items-center gap-1">
+                              {p.ign}
+                              {isGraded && <span className="text-emerald-400 text-[10px]" title="กรอกคะแนนแล้ว">✅</span>}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                          <span className="text-xs text-sky-400 font-extrabold bg-sky-500/10 px-2.5 py-1 rounded-lg border border-sky-500/30">
+                            {p.role}
+                          </span>
+                          {isAdmin && (
+                            <button onClick={() => handleDeletePlayerCompletely(p.id, p.ign)} className="text-[10px] bg-red-500/10 text-red-400 px-2 py-1 rounded border border-red-500/20 hover:bg-red-500/30">ลบ</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
 
             <button onClick={() => setSelectedTeam(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold mt-2">ปิดหน้าต่าง</button>
           </div>
         </div>
       )}
 
-      {/* MODAL: EDIT PLAYER */}
-      {editingPlayer && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xs rounded-xl p-4 space-y-3">
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <h3 className="font-bold text-sky-400">✏️ แก้ไขข้อมูลผู้เล่น</h3>
-              <button onClick={() => setEditingPlayer(null)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
-            </div>
-            
-            <form onSubmit={handleUpdatePlayer} className="space-y-3">
-              <div>
-                <label className="text-[10px] text-zinc-400 block mb-1">ชื่อ IGN</label>
-                <input type="text" value={editIgn} onChange={e => setEditIgn(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              </div>
-              <div>
-                <label className="text-[10px] text-zinc-400 block mb-1">ลิงก์รูปผู้เล่น (Avatar URL)</label>
-                <input type="text" value={editPlayerAvatarUrl} onChange={e => setEditPlayerAvatarUrl(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-zinc-400 block mb-1">ตำแหน่งหลัก</label>
-                  <select value={editRole} onChange={e => setEditRole(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-zinc-400 block mb-1">ตำแหน่งรอง</label>
-                  <select value={editSubRole} onChange={e => setEditSubRole(e.target.value)} className="w-full bg-black p-2 rounded text-white border border-zinc-800">
-                    <option value="">-- ไม่มีตำแหน่งรอง --</option>
-                    <option value="ATK 1">ATK 1</option>
-                    <option value="ATK 2">ATK 2</option>
-                    <option value="IGL">IGL</option>
-                    <option value="Scout">Scout</option>
-                    <option value="Flex">Flex</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-sky-500 text-black font-bold py-2 rounded">บันทึก</button>
-                <button type="button" onClick={() => setEditingPlayer(null)} className="flex-1 bg-zinc-800 text-zinc-300 py-2 rounded">ยกเลิก</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: SCRIM DETAIL POPUP */}
-      {selectedScrimDetail && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+      {/* ================= MODAL: HISTORY AUDIT LOG ================= */}
+      {showHistoryModal && activeHistoryScrim && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div>
-                <h3 className="font-bold text-sky-400 text-sm">🏠 {selectedScrimDetail.name}</h3>
-                <p className="text-[10px] text-zinc-400">วันที่ซ้อม: {selectedScrimDetail.scrim_date} | จำนวนเกม: {selectedScrimDetail.total_matches || 5} เกม</p>
+                <h3 className="font-bold text-sky-400 text-sm">📊 ผลงานผู้เล่นรอบ: {activeHistoryScrim.scrim_name}</h3>
+                <p className="text-[10px] text-zinc-400">แต้มห้องซ้อมนี้: คิล {activeHistoryScrim.kill_points} | อันดับ {activeHistoryScrim.placement_points}</p>
               </div>
-              <button onClick={() => setSelectedScrimDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
+              <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
 
-            {selectedScrimDetail.image_url && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-sky-400 font-bold">📸 รูปตารางคะแนนห้องซ้อม:</p>
-                <img 
-                  src={selectedScrimDetail.image_url} 
-                  alt={selectedScrimDetail.name} 
-                  onClick={() => setPreviewImage({ url: selectedScrimDetail.image_url, title: `ตารางห้องซ้อม: ${selectedScrimDetail.name}` })}
-                  className="w-full h-36 object-cover rounded-lg bg-black border border-zinc-800 cursor-pointer hover:border-sky-400 transition"
-                  title="คลิกเพื่อดูรูปขนาดใหญ่"
-                />
-              </div>
-            )}
+            {(() => {
+              const logs = allScoreHistory.filter(h => String(h.scrim_session_id) === String(activeHistoryScrim.id));
+              if (logs.length === 0) {
+                return <p className="text-zinc-500 italic text-center py-6">ยังไม่มีการบันทึกสถิติผู้เล่นในรอบนี้</p>;
+              }
 
-            <div className="space-y-2">
-              <p className="text-zinc-300 font-bold">📊 ผลคะแนนในห้องซ้อมนี้:</p>
-              {allScrimScores.filter(s => String(s.scrim_tournament_id) === String(selectedScrimDetail.id)).length === 0 ? (
-                <p className="text-zinc-500 italic text-center py-4">ยังไม่มีการบันทึกคะแนนในวันนี้</p>
-              ) : (
-                allScrimScores
-                  .filter(s => String(s.scrim_tournament_id) === String(selectedScrimDetail.id))
-                  .map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) }))
-                  .sort((a, b) => b.total - a.total)
-                  .map((scoreItem, idx) => {
-                    const teamInfo = teams.find(tm => String(tm.id) === String(scoreItem.team_id));
-                    return (
-                      <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
-                            idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
-                          }`}>{idx + 1}</span>
-                          <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-black text-sky-400 text-sm">{scoreItem.total} แต้ม</span>
-                          <span className="text-[9px] text-zinc-400 block">Kill: {scoreItem.kill_points} | Place: {scoreItem.placement_points}</span>
-                        </div>
+              const groupedLogs: { [time: string]: any[] } = {};
+              logs.forEach(l => {
+                const timeKey = new Date(l.created_at).toLocaleString('th-TH');
+                if (!groupedLogs[timeKey]) groupedLogs[timeKey] = [];
+                groupedLogs[timeKey].push(l);
+              });
+
+              return (
+                <div className="space-y-4">
+                  {Object.entries(groupedLogs).map(([timestamp, playerLogs], idx) => (
+                    <div key={timestamp} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                      <div className="flex justify-between items-center border-b border-zinc-900 pb-1 text-[10px]">
+                        <span className="text-sky-400 font-bold">บันทึกครั้งที่ #{idx + 1}</span>
+                        <span className="text-zinc-400">{timestamp}</span>
                       </div>
-                    );
-                  })
-              )}
-            </div>
-
-            <button onClick={() => setSelectedScrimDetail(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: TOURNAMENT DETAIL POPUP */}
-      {selectedTourneyDetail && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <div>
-                <h3 className="font-bold text-sky-300 text-sm">🏆 {selectedTourneyDetail.name}</h3>
-                <p className="text-[10px] text-zinc-400">วันที่แข่ง: {selectedTourneyDetail.created_at ? new Date(selectedTourneyDetail.created_at).toISOString().split('T')[0] : ''}</p>
-                {selectedTourneyDetail.prize_pool && (
-                  <p className="text-[11px] text-emerald-400 font-bold mt-0.5">💰 เงินรางวัล: {selectedTourneyDetail.prize_pool}</p>
-                )}
-              </div>
-              <button onClick={() => setSelectedTourneyDetail(null)} className="text-zinc-400 hover:text-white text-base font-bold">✕</button>
-            </div>
-
-            {selectedTourneyDetail.image_url && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-sky-300 font-bold">📸 รูปตารางคะแนนทัวร์นาเมนต์:</p>
-                <img 
-                  src={selectedTourneyDetail.image_url} 
-                  alt={selectedTourneyDetail.name} 
-                  onClick={() => setPreviewImage({ url: selectedTourneyDetail.image_url, title: `ตารางทัวร์: ${selectedTourneyDetail.name}` })}
-                  className="w-full h-36 object-cover rounded-lg bg-black border border-zinc-800 cursor-pointer hover:border-sky-400 transition"
-                  title="คลิกเพื่อดูรูปขนาดใหญ่"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <p className="text-zinc-300 font-bold">📊 ผลคะแนนในทัวร์นี้:</p>
-              {allScores.filter(s => String(s.tournament_id) === String(selectedTourneyDetail.id)).length === 0 ? (
-                <p className="text-zinc-500 italic text-center py-4">ยังไม่มีการบันทึกคะแนนในทัวร์นี้</p>
-              ) : (
-                allScores
-                  .filter(s => String(s.tournament_id) === String(selectedTourneyDetail.id))
-                  .map(s => ({ ...s, total: (s.kill_points || 0) + (s.placement_points || 0) }))
-                  .sort((a, b) => b.total - a.total)
-                  .map((scoreItem, idx) => {
-                    const teamInfo = teams.find(tm => String(tm.id) === String(scoreItem.team_id));
-                    return (
-                      <div key={scoreItem.id} className="bg-black p-2.5 rounded-lg border border-zinc-800 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
-                            idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'
-                          }`}>{idx + 1}</span>
-                          <span className="font-bold text-white">[{teamInfo?.tag || 'N/A'}] {teamInfo?.name || 'Unknown Team'}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-black text-sky-300 text-sm">{scoreItem.total} แต้ม</span>
-                          <span className="text-[9px] text-zinc-400 block">Kill: {scoreItem.kill_points} | Place: {scoreItem.placement_points}</span>
-                        </div>
+                      <div className="space-y-1.5 pt-1">
+                        {playerLogs.map((pl: any) => (
+                          <div key={pl.id} className="bg-zinc-950 p-2 rounded-lg border border-zinc-900 flex justify-between items-center text-[10px]">
+                            <div>
+                              <strong className="text-white text-xs">{pl.ign}</strong>
+                            </div>
+                            <div className="text-right space-x-2">
+                              <span>เกม: <strong className="text-white">{pl.matches}</strong></span>
+                              <span>คิล: <strong className="text-sky-400">{pl.kills}</strong></span>
+                              <span>แอส: <strong className="text-white">{pl.assists}</strong></span>
+                              <span>ดาเมจ: <strong className="text-white">{pl.damage}</strong></span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })
-              )}
-            </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
-            <button onClick={() => setSelectedTourneyDetail(null)} className="w-full bg-zinc-800 text-white py-2 rounded font-bold">ปิดหน้าต่าง</button>
+            <button onClick={() => setShowHistoryModal(false)} className="w-full bg-zinc-800 text-white py-2 rounded-xl font-bold mt-2">ปิดหน้าต่าง</button>
           </div>
         </div>
       )}
 
-      {/* MODAL: PLAYER FULL PROFILE DETAILS + HISTORIES */}
+      {/* ================= MODAL: BATCH PLAYER SCORES ================= */}
+      {showBatchScoreModal && selectedTeam && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 text-xs">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+              <h3 className="font-bold text-sky-400 text-sm">📝 กรอกคะแนนผู้เล่นทั้งทีม: [{selectedTeam.tag}]</h3>
+              <button onClick={() => setShowBatchScoreModal(false)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] text-zinc-300 font-bold block">🏠 เลือกห้องซ้อม / แมตช์ที่ต้องการอ้างอิง:</label>
+              <select 
+                value={selectedScrimSessionId} 
+                onChange={(e) => setSelectedScrimSessionId(e.target.value)} 
+                className="w-full bg-black border border-zinc-700 p-2 rounded-xl text-xs text-white"
+              >
+                {selectedTeam.scrimHistory.map((s: any, idx: number) => {
+                  const count = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id)).length;
+                  return (
+                    <option key={s.id} value={s.id}>
+                      #{idx + 1} - {s.scrim_name} (กรอกแล้ว {count}/6 ครั้ง)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {(() => {
+              const currentScrim = selectedTeam.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
+              const maxKills = currentScrim ? Number(currentScrim.kill_points) || 0 : 0;
+              const inputSumKills = Object.values(batchPlayerScores).reduce((sum: number, p: any) => sum + (Number(p.kills) || 0), 0);
+              const isOver = inputSumKills > maxKills;
+              const sessionCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
+              const isFull = sessionCount >= 6;
+
+              return (
+                <div className="space-y-2">
+                  <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isFull ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'}`}>
+                    <span>สถานะการกรอกห้องนี้: <strong>{sessionCount}/6 ครั้ง</strong></span>
+                    <span>{isFull ? '⚠️ กรอกครบ 6 ครั้งแล้ว (ล็อก)' : '✅ สามารถกรอกเพิ่มได้'}</span>
+                  </div>
+
+                  <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isOver ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-sky-500/10 border-sky-500/30 text-sky-300'}`}>
+                    <span>เป้าหมายคิลห้องซ้อมนี้: <strong>{maxKills} คิล</strong></span>
+                    <span>กรอกแล้วรวม: <strong className={isOver ? 'text-red-400 font-black text-xs' : 'text-white'}>{inputSumKills}</strong> คิล</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="space-y-3 pt-1">
+              {[...selectedTeam.roster].sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' })).map((player: any) => {
+                const pScore = batchPlayerScores[player.id] || { matches: 0, kills: 0, assists: 0, damage: 0, survived: 0, rescue: 0 };
+                return (
+                  <div key={player.id} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                    <div className="flex items-center gap-2 border-b border-zinc-900 pb-1.5">
+                      {player.avatar_url && <img src={player.avatar_url} alt={player.ign} className="w-6 h-6 object-cover rounded bg-zinc-950" />}
+                      <span className="font-bold text-white text-xs">{player.ign}</span>
+                      <span className="text-[9px] text-sky-400 bg-zinc-900 px-1.5 py-0.5 rounded ml-auto">{player.role}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">เกม</span>
+                        <input 
+                          type="number" 
+                          value={pScore.matches} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, matches: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">คิล (Kills)</span>
+                        <input 
+                          type="number" 
+                          value={pScore.kills} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, kills: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center font-bold text-sky-400" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">แอสซิสต์</span>
+                        <input 
+                          type="number" 
+                          value={pScore.assists} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, assists: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">ดาเมจ</span>
+                        <input 
+                          type="number" 
+                          value={pScore.damage} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, damage: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">รอดชีวิต</span>
+                        <input 
+                          type="number" 
+                          value={pScore.survived} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, survived: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px]">ช่วยเพื่อน</span>
+                        <input 
+                          type="number" 
+                          value={pScore.rescue} 
+                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, rescue: Number(e.target.value) } })} 
+                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const sessionCount = allScoreHistory.filter(h => String(h.scrim_session_id) === String(selectedScrimSessionId)).length;
+              const isFull = sessionCount >= 6;
+
+              return (
+                <button 
+                  onClick={() => handleSaveBatchPlayerScores(selectedTeam)} 
+                  disabled={isFull}
+                  className={`w-full font-bold py-2 rounded-xl text-xs mt-2 transition shadow-lg ${isFull ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-sky-500 hover:bg-sky-400 text-black'}`}
+                >
+                  {isFull ? '❌ กรอกครบ 6 ครั้งแล้ว (ไม่สามารถบันทึกเพิ่มได้)' : '💾 บันทึกคะแนนผู้เล่นทั้งทีม'}
+                </button>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PLAYER PROFILE ================= */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 text-xs">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-            <div className="text-center border-b border-zinc-800 pb-3 flex flex-col items-center">
+            <div className="flex items-center gap-4 border-b border-zinc-800 pb-3">
               {selectedPlayer.avatar_url && !imageHasError ? (
-                <img 
-                  src={selectedPlayer.avatar_url} 
-                  alt={selectedPlayer.ign} 
-                  onError={() => setImageHasError(true)}
-                  onClick={() => setPreviewImage({ url: selectedPlayer.avatar_url, title: `รูปผู้เล่น: ${selectedPlayer.ign}` })}
-                  className="w-16 h-16 object-cover rounded-xl bg-zinc-950 p-0.5 border border-zinc-800 mb-2 hover:scale-105 hover:border-sky-400 transition cursor-pointer" 
-                  title="คลิกเพื่อดูรูปขนาดใหญ่"
-                />
+                <img src={selectedPlayer.avatar_url} alt={selectedPlayer.ign} onError={() => setImageHasError(true)} className="w-16 h-16 object-cover rounded-xl bg-zinc-950 border border-zinc-800 shrink-0" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-zinc-950 border border-zinc-800 mb-2 flex flex-col items-center justify-center text-zinc-500 text-[9px] p-1 text-center">
-                  <span>🖼️</span>
-                  <span className="mt-0.5">ลิงก์รูปเสีย/ไม่มีรูป</span>
-                </div>
+                <div className="w-16 h-16 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 flex items-center justify-center text-zinc-500 text-[9px]">ไม่มีรูป</div>
               )}
-              <h3 className="font-black text-white text-base">{selectedPlayer.ign}</h3>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-[11px] bg-zinc-800 px-2 py-0.5 rounded text-sky-400">หลัก: {selectedPlayer.role}</span>
-                {selectedPlayer.sub_role && <span className="text-[11px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">รอง: {selectedPlayer.sub_role}</span>}
+              <div className="flex flex-col">
+                <h3 className="font-black text-white text-lg leading-tight">{selectedPlayer.ign}</h3>
+                <span className="text-xs text-sky-400 font-semibold mt-1">{selectedPlayer.role}</span>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-              <button 
-                onClick={() => setPlayerModalTab('scrims')} 
-                className={`py-1.5 font-bold rounded-lg transition text-[11px] ${playerModalTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400 hover:text-white'}`}
-              >
-                🏠 ห้องซ้อม
-              </button>
-              <button 
-                onClick={() => setPlayerModalTab('tournaments')} 
-                className={`py-1.5 font-bold rounded-lg transition text-[11px] ${playerModalTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400 hover:text-white'}`}
-              >
-                🏆 ห้องแข่ง
-              </button>
+              <button onClick={() => setPlayerModalTab('scrims')} className={`py-1.5 font-bold rounded-lg transition text-[11px] ${playerModalTab === 'scrims' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏠 ห้องซ้อม</button>
+              <button onClick={() => setPlayerModalTab('tournaments')} className={`py-1.5 font-bold rounded-lg transition ${playerModalTab === 'tournaments' ? 'bg-sky-500 text-black shadow' : 'text-zinc-400'}`}>🏆 ห้องแข่ง</button>
             </div>
 
-            <div className="space-y-3">
-              {playerModalTab === 'scrims' ? (
-                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-sky-400 font-bold">🏠 พลังแฝงห้องซ้อม (Scrims Radar)</span>
-                    <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.total_matches || 0} เกม</strong></span>
-                  </div>
+            {playerModalTab === 'scrims' ? (
+              <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-sky-400 font-bold">🏠 พลังแฝงห้องซ้อม (Scrims Radar)</span>
+                  <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.total_matches || 0} เกม</strong></span>
+                </div>
 
-                  {renderRadarChart(
-                    selectedPlayer.total_matches || 0,
-                    selectedPlayer.total_kills || 0,
-                    selectedPlayer.Assists || 0,
-                    selectedPlayer.Damage || 0,
-                    selectedPlayer.Survived || 0,
-                    selectedPlayer.Rescue || 0
-                  )}
+                <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 text-center">
+                  <span className="text-[9px] text-zinc-400 block mb-0.5">KDA (Scrims)</span>
+                  <strong className="text-base text-amber-300 font-black">
+                    {((((selectedPlayer.total_kills || 0) + (selectedPlayer.Assists || 0))) / (selectedPlayer.total_matches > 0 ? selectedPlayer.total_matches : 1)).toFixed(2)}
+                  </strong>
+                </div>
 
-                  <div className="grid grid-cols-5 gap-1 text-center text-[10px] bg-zinc-950 p-2 rounded-lg border border-zinc-900">
-                    <div><span className="text-zinc-500 block">Kill</span><strong className="text-white">{selectedPlayer.total_kills || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Assist</span><strong className="text-white">{selectedPlayer.Assists || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Damage</span><strong className="text-white">{selectedPlayer.Damage || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Survived</span><strong className="text-emerald-400">{selectedPlayer.Survived || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Rescue</span><strong className="text-amber-400">{selectedPlayer.Rescue || 0}</strong></div>
-                  </div>
+                {renderRadarChart(selectedPlayer.total_matches || 0, selectedPlayer.total_kills || 0, selectedPlayer.Assists || 0, selectedPlayer.Damage || 0, selectedPlayer.Survived || 0, selectedPlayer.Rescue || 0)}
 
-                  <div className="grid grid-cols-3 gap-1 text-center pt-2 border-t border-zinc-900">
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Kills/Game</span>
-                      <strong className="text-sm font-black text-sky-400">{selectedPlayer.total_matches ? (selectedPlayer.total_kills / selectedPlayer.total_matches).toFixed(1) : 0}</strong>
+                <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 space-y-2">
+                  <span className="text-[10px] text-sky-400 font-bold block border-b border-zinc-900 pb-1">📋 สถิติรวมห้องซ้อมทั้งหมด</span>
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">คิลรวม</span>
+                      <strong className="text-sky-400">{selectedPlayer.total_kills || 0}</strong>
                     </div>
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Assists/Game</span>
-                      <strong className="text-sm font-black text-sky-300">{selectedPlayer.total_matches ? (selectedPlayer.Assists / selectedPlayer.total_matches).toFixed(1) : 0}</strong>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">ดาเมจรวม</span>
+                      <strong className="text-white">{selectedPlayer.Damage || 0}</strong>
                     </div>
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Dmg/Game</span>
-                      <strong className="text-sm font-black text-sky-200">{selectedPlayer.total_matches ? Math.round(selectedPlayer.Damage / selectedPlayer.total_matches) : 0}</strong>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">แอสซิสต์รวม</span>
+                      <strong className="text-white">{selectedPlayer.Assists || 0}</strong>
                     </div>
-                  </div>
-
-                  {/* แสดงประวัติห้องซ้อมของทีมที่ผู้เล่นสังกัด */}
-                  <div className="pt-2 border-t border-zinc-900 space-y-1.5">
-                    <p className="text-[11px] text-sky-400 font-bold">📜 ห้องซ้อมที่สังกัดเคยลง:</p>
-                    {selectedPlayer.team_id ? (
-                      allScrimScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).length === 0 ? (
-                        <p className="text-[10px] text-zinc-500 italic">ทีมยังไม่มีประวัติลงห้องซ้อม</p>
-                      ) : (
-                        allScrimScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).map(sItem => {
-                          const stInfo = scrimTournaments.find(st => String(st.id) === String(sItem.scrim_tournament_id));
-                          const totalS = (sItem.kill_points || 0) + (sItem.placement_points || 0);
-                          return (
-                            <div key={sItem.id} className="bg-zinc-950 p-2 rounded border border-zinc-900 flex justify-between items-center text-[10px]">
-                              <span className="text-zinc-300">🏠 {stInfo?.name || 'ห้องซ้อม'} ({stInfo?.scrim_date || ''})</span>
-                              <span className="font-black text-sky-400">{totalS} แต้ม</span>
-                            </div>
-                          );
-                        })
-                      )
-                    ) : (
-                      <p className="text-[10px] text-zinc-500 italic">ผู้เล่นยังไม่สังกัด Team ใด (Free Agent)</p>
-                    )}
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">รอดชีวิตรวม</span>
+                      <strong className="text-white">{selectedPlayer.Survived || 0}</strong>
+                    </div>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">ช่วยเพื่อนรวม</span>
+                      <strong className="text-white">{selectedPlayer.Rescue || 0}</strong>
+                    </div>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">เกมรวม</span>
+                      <strong className="text-white">{selectedPlayer.total_matches || 0}</strong>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-sky-300 font-bold">🏆 พลังแฝงห้องแข่ง (Tournament Radar)</span>
-                    <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.tourney_matches || 0} เกม</strong></span>
-                  </div>
+              </div>
+            ) : (
+              <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-sky-300 font-bold">🏆 พลังแฝงห้องแข่ง (Tournament Radar)</span>
+                  <span className="text-zinc-400">ลง: <strong className="text-white">{selectedPlayer.tourney_matches || 0} เกม</strong></span>
+                </div>
 
-                  {renderRadarChart(
-                    selectedPlayer.tourney_matches || 0,
-                    selectedPlayer.tourney_kills || 0,
-                    selectedPlayer.tourney_assists || 0,
-                    selectedPlayer.tourney_damage || 0,
-                    selectedPlayer.tourney_survived || 0,
-                    selectedPlayer.tourney_rescue || 0
-                  )}
+                <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 text-center">
+                  <span className="text-[9px] text-zinc-400 block mb-0.5">KDA (Tourney)</span>
+                  <strong className="text-base text-amber-300 font-black">
+                    {((((selectedPlayer.tourney_kills || 0) + (selectedPlayer.tourney_assists || 0))) / (selectedPlayer.tourney_matches > 0 ? selectedPlayer.tourney_matches : 1)).toFixed(2)}
+                  </strong>
+                </div>
 
-                  <div className="grid grid-cols-5 gap-1 text-center text-[10px] bg-zinc-950 p-2 rounded-lg border border-zinc-900">
-                    <div><span className="text-zinc-500 block">Kill</span><strong className="text-white">{selectedPlayer.tourney_kills || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Assist</span><strong className="text-white">{selectedPlayer.tourney_assists || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Damage</span><strong className="text-white">{selectedPlayer.tourney_damage || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Survived</span><strong className="text-emerald-300">{selectedPlayer.tourney_survived || 0}</strong></div>
-                    <div><span className="text-zinc-500 block">Rescue</span><strong className="text-amber-300">{selectedPlayer.tourney_rescue || 0}</strong></div>
-                  </div>
+                {renderRadarChart(selectedPlayer.tourney_matches || 0, selectedPlayer.tourney_kills || 0, selectedPlayer.tourney_assists || 0, selectedPlayer.tourney_damage || 0, selectedPlayer.tourney_survived || 0, selectedPlayer.tourney_rescue || 0)}
 
-                  <div className="grid grid-cols-3 gap-1 text-center pt-2 border-t border-zinc-900">
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Kills/Game</span>
-                      <strong className="text-sm font-black text-sky-300">{selectedPlayer.tourney_matches ? (selectedPlayer.tourney_kills / selectedPlayer.tourney_matches).toFixed(1) : 0}</strong>
+                <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 space-y-2">
+                  <span className="text-[10px] text-amber-300 font-bold block border-b border-zinc-900 pb-1">📋 สถิติรวมห้องแข่งทั้งหมด</span>
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">คิลรวม</span>
+                      <strong className="text-amber-300">{selectedPlayer.tourney_kills || 0}</strong>
                     </div>
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Assists/Game</span>
-                      <strong className="text-sm font-black text-sky-200">{selectedPlayer.tourney_matches ? (selectedPlayer.tourney_assists / selectedPlayer.tourney_matches).toFixed(1) : 0}</strong>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">ดาเมจรวม</span>
+                      <strong className="text-white">{selectedPlayer.tourney_damage || 0}</strong>
                     </div>
-                    <div className="bg-zinc-950 p-1.5 rounded-lg border border-zinc-900">
-                      <span className="text-[9px] text-zinc-400 block">Dmg/Game</span>
-                      <strong className="text-sm font-black text-sky-100">{selectedPlayer.tourney_matches ? Math.round(selectedPlayer.tourney_damage / selectedPlayer.tourney_matches) : 0}</strong>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">แอสซิสต์รวม</span>
+                      <strong className="text-white">{selectedPlayer.tourney_assists || 0}</strong>
                     </div>
-                  </div>
-
-                  {/* แสดงประวัติทัวร์นาเมนต์ของทีมที่ผู้เล่นสังกัด */}
-                  <div className="pt-2 border-t border-zinc-900 space-y-1.5">
-                    <p className="text-[11px] text-sky-300 font-bold">📜 ทัวร์นาเมนต์ที่สังกัดเคยลง:</p>
-                    {selectedPlayer.team_id ? (
-                      allScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).length === 0 ? (
-                        <p className="text-[10px] text-zinc-500 italic">ทีมยังไม่มีประวัติลงทัวร์นาเมนต์</p>
-                      ) : (
-                        allScores.filter(s => String(s.team_id) === String(selectedPlayer.team_id)).map(tItem => {
-                          const trInfo = tournaments.find(tr => String(tr.id) === String(tItem.tournament_id));
-                          const totalT = (tItem.kill_points || 0) + (tItem.placement_points || 0);
-                          const trDate = trInfo?.created_at ? new Date(trInfo.created_at).toISOString().split('T')[0] : '';
-                          return (
-                            <div key={tItem.id} className="bg-zinc-950 p-2 rounded border border-zinc-900 flex justify-between items-center text-[10px]">
-                              <span className="text-zinc-300">🏆 {trInfo?.name || 'ทัวร์นาเมนต์'} ({trDate})</span>
-                              <span className="font-black text-sky-300">{totalT} แต้ม</span>
-                            </div>
-                          );
-                        })
-                      )
-                    ) : (
-                      <p className="text-[10px] text-zinc-500 italic">ผู้เล่นยังไม่สังกัด Team ใด (Free Agent)</p>
-                    )}
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">รอดชีวิตรวม</span>
+                      <strong className="text-white">{selectedPlayer.tourney_survived || 0}</strong>
+                    </div>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">ช่วยเพื่อนรวม</span>
+                      <strong className="text-white">{selectedPlayer.tourney_rescue || 0}</strong>
+                    </div>
+                    <div className="bg-black p-1.5 rounded border border-zinc-900">
+                      <span className="text-zinc-400 block text-[9px]">เกมรวม</span>
+                      <strong className="text-white">{selectedPlayer.tourney_matches || 0}</strong>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex gap-2 pt-1">
-              {isAdmin && (
-                <button onClick={() => handleResetPlayerStats(selectedPlayer.id, selectedPlayer.ign)} className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 py-2 rounded font-bold">🗑️ ล้างแต้ม</button>
-              )}
-              <button onClick={() => setSelectedPlayer(null)} className="py-2 bg-zinc-800 text-white rounded font-bold flex-1">ปิดหน้าต่าง</button>
-            </div>
+            <button onClick={() => setSelectedPlayer(null)} className="py-2 bg-zinc-800 text-white rounded font-bold w-full">ปิดหน้าต่าง</button>
           </div>
         </div>
       )}
 
-      {/* MODAL: IMAGE LIGHTBOX POPUP */}
       {previewImage && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="relative max-w-lg w-full flex flex-col items-center space-y-3">
             <div className="w-full flex justify-between items-center px-1">
               <span className="text-sky-400 font-bold text-xs">{previewImage.title}</span>
-              <button 
-                onClick={() => setPreviewImage(null)} 
-                className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center transition"
-              >
-                ✕
-              </button>
+              <button onClick={() => setPreviewImage(null)} className="bg-zinc-800 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center">✕</button>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 p-2 rounded-2xl overflow-hidden shadow-2xl max-h-[80vh] flex items-center justify-center w-full">
+            <div className="bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-2xl max-h-[80vh] flex items-center justify-center w-full">
               <img src={previewImage.url} alt="Preview" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
             </div>
-            <button 
-              onClick={() => setPreviewImage(null)} 
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs font-bold transition"
-            >
-              ปิดหน้าต่าง
-            </button>
           </div>
         </div>
       )}
