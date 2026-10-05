@@ -41,6 +41,10 @@ export default function Home() {
   const [showPromoModal, setShowPromoModal] = useState(false);
   
   const [promoTeamTarget, setPromoTeamTarget] = useState<any | null>(null);
+  
+  const [generatedPromoUrl, setGeneratedPromoUrl] = useState<string | null>(null);
+  const [generatedSingleTeamUrl, setGeneratedSingleTeamUrl] = useState<string | null>(null);
+
   const promoRef = useRef<HTMLDivElement>(null);
   const singleTeamPromoRef = useRef<HTMLDivElement>(null);
 
@@ -335,30 +339,32 @@ export default function Home() {
   const rankedTeams = [...filteredTeams].sort((a, b) => b.totalPts - a.totalPts);
   const activeSelectedTeam = selectedTeam ? teamsWithDetails.find(t => String(t.id) === String(selectedTeam.id)) : null;
 
-  async function handleDownloadPromoImage() {
+  // 🌟 ตั้งค่า pixelRatio เป็น 4 เพื่อความคมชัดสูงสุดระดับ 4K ขยายใหญ่ได้สะใจ
+  async function handleGeneratePromoImage() {
     if (!promoRef.current) return;
     try {
-      const dataUrl = await htmlToImage.toPng(promoRef.current, { cacheBust: true, quality: 0.95 });
-      const link = document.createElement('a');
-      link.download = `Leaderboard_${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
+      const dataUrl = await htmlToImage.toPng(promoRef.current, { cacheBust: true, quality: 1.0, pixelRatio: 4 });
+      setGeneratedPromoUrl(dataUrl);
     } catch (err) {
       alert('ไม่สามารถสร้างรูปภาพได้: ' + err);
     }
   }
 
-  async function handleDownloadSingleTeamImage() {
+  async function handleGenerateSingleTeamImage() {
     if (!singleTeamPromoRef.current) return;
     try {
-      const dataUrl = await htmlToImage.toPng(singleTeamPromoRef.current, { cacheBust: true, quality: 0.95 });
-      const link = document.createElement('a');
-      link.download = `Team_${promoTeamTarget?.tag || 'Profile'}_${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
+      const dataUrl = await htmlToImage.toPng(singleTeamPromoRef.current, { cacheBust: true, quality: 1.0, pixelRatio: 4 });
+      setGeneratedSingleTeamUrl(dataUrl);
     } catch (err) {
       alert('ไม่สามารถสร้างรูปภาพทีมได้: ' + err);
     }
+  }
+
+  function downloadImage(url: string, filename: string) {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    link.click();
   }
 
   return (
@@ -373,7 +379,10 @@ export default function Home() {
         <div className="flex items-center gap-1.5">
           {isAdmin && (
             <button
-              onClick={() => setShowPromoModal(true)}
+              onClick={() => {
+                setGeneratedPromoUrl(null);
+                setShowPromoModal(true);
+              }}
               className="bg-sky-500 hover:bg-sky-400 text-black text-[9px] px-2 py-1 rounded font-black transition cursor-pointer shadow"
             >
               🖼️ โปสเตอร์รวม
@@ -422,63 +431,99 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างสร้างรูปโปสเตอร์รวมทีม (เฉพาะแอดมิน) ================= */}
+      {/* ================= MODAL: หน้าต่างสร้างรูปโปสเตอร์รวมทีม (แนวนอน 3 คอลัมน์ ขยายใหญ่คมชัด 4K) ================= */}
       {isAdmin && showPromoModal && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
-          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-4xl rounded-2xl p-4 space-y-4 shadow-2xl max-h-[95vh] flex flex-col">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
-              <h3 className="font-bold text-sky-400 text-sm">🖼️ รูปโปรโมทตารางคะแนนรวม</h3>
+              <h3 className="font-bold text-sky-400 text-sm">🖼️ รูปโปสเตอร์รวม (แนวนอน 3 คอลัมน์ - ขยายชัดระดับ 4K)</h3>
               <button onClick={() => setShowPromoModal(false)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
             <div className="overflow-y-auto space-y-3 pr-1 flex-1">
-              <div 
-                ref={promoRef} 
-                className="bg-zinc-950 p-4 rounded-2xl border-2 border-sky-500/40 space-y-3 shadow-2xl text-white relative overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-sky-500/10 via-transparent to-black/60 pointer-events-none" />
-                
-                <div className="text-center space-y-0.5 relative z-10 border-b border-zinc-800 pb-3">
-                  <h2 className="text-base font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h2>
-                  <p className="text-[10px] text-pink-300 font-bold">OVERALL LEADERBOARD STANDINGS</p>
-                  <p className="text-[9px] text-zinc-400">Sponsor By CONYSWEET</p>
+              {generatedPromoUrl ? (
+                <div className="space-y-2 text-center">
+                  <p className="text-[10px] text-emerald-400 font-bold">✨ สร้างภาพความละเอียดสูงสำเร็จ! คลิกที่รูปเพื่อเปิดดูแบบเต็มจอและซูมขยายได้สูงสุด</p>
+                  <img 
+                    src={generatedPromoUrl} 
+                    alt="Leaderboard Promo 4K" 
+                    onClick={() => setPreviewImage({ url: generatedPromoUrl, title: 'ตารางคะแนนรวม แนวนอน 4K (ขนาดเต็ม)' })}
+                    className="w-full rounded-xl border border-sky-500/50 cursor-pointer shadow-2xl hover:opacity-95 transition"
+                  />
                 </div>
+              ) : (
+                <div 
+                  ref={promoRef} 
+                  className="bg-black p-8 rounded-3xl border-2 border-sky-500/40 space-y-6 shadow-2xl text-white relative overflow-hidden"
+                  style={{ width: '1200px' }}
+                >
+                  <div className="text-center space-y-1.5 border-b border-zinc-800 pb-4">
+                    <h2 className="text-xl font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS - OVERALL STANDINGS</h2>
+                    <p className="text-xs text-zinc-400">Sponsor By CONYSWEET</p>
+                  </div>
 
-                <div className="space-y-1.5 relative z-10">
-                  {teamsWithDetails
-                    .sort((a, b) => b.totalPts - a.totalPts)
-                    .map((t, idx) => (
-                      <div key={t.id} className="bg-black/80 p-2 rounded-xl border border-zinc-800 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2.5">
-                          <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-amber-500 text-black' : idx === 1 ? 'bg-zinc-300 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
-                            {idx + 1}
-                          </span>
-                          {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 object-contain rounded bg-zinc-900 p-0.5" />}
-                          <div>
-                            <span className="text-[10px] text-sky-400 font-bold">[{t.tag}]</span>
-                            <span className="font-bold text-white text-xs ml-1">{t.name}</span>
+                  {/* 🌟 จัดเรียงเป็นแนวนอน 3 คอลัมน์ */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {teamsWithDetails
+                      .sort((a, b) => b.totalPts - a.totalPts)
+                      .map((t, idx) => (
+                        <div 
+                          key={t.id} 
+                          className="p-4 rounded-2xl border-2 border-zinc-800 relative overflow-hidden shadow-2xl bg-zinc-950 flex items-center justify-between"
+                        >
+                          {t.logo_url && (
+                            <div 
+                              className="absolute inset-0 bg-no-repeat bg-right bg-cover opacity-25 pointer-events-none filter blur-[2px] scale-125" 
+                              style={{ backgroundImage: `url(${t.logo_url})` }}
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/40 pointer-events-none" />
+
+                          <div className="relative z-10 flex items-center gap-4 min-w-0 flex-1">
+                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 shadow ${idx === 0 ? 'bg-amber-500 text-black' : idx === 1 ? 'bg-zinc-300 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                              {idx + 1}
+                            </span>
+                            {t.logo_url ? (
+                              <img src={t.logo_url} alt={t.name} className="w-12 h-12 object-contain rounded-xl bg-zinc-950/90 p-1.5 border border-zinc-700/80 shrink-0 shadow-lg" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500 shrink-0">ไม่มีโลโก้</div>
+                            )}
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <span className="text-[10px] font-black bg-sky-500/30 text-sky-300 px-2 py-0.5 rounded border border-sky-500/50 inline-block">[{t.tag}]</span>
+                              <h3 className="font-black text-sm text-white drop-shadow truncate">{t.name}</h3>
+                              <div className="text-[11px] text-zinc-300 flex gap-3">
+                                <span>คะแนนรวม: <strong className="text-sky-400">{t.totalPts}</strong></span>
+                                <span>AVG: <strong className="text-emerald-400">{t.avgPts}</strong></span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-black text-sky-400 text-sm">{t.totalPts} <span className="text-[9px] text-zinc-400">Pts</span></span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                      ))}
+                  </div>
 
-                <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-500">
-                  Generated by iSotope Esports Manager System
+                  <div className="text-center pt-4 border-t border-zinc-900 text-[10px] text-zinc-500">
+                    Generated by iSotope Esports Manager System
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="shrink-0 pt-2 border-t border-zinc-800 flex gap-2">
-              <button 
-                onClick={handleDownloadPromoImage}
-                className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
-              >
-                📥 ดาวน์โหลดรูปตารางรวม
-              </button>
+              {!generatedPromoUrl ? (
+                <button 
+                  onClick={handleGeneratePromoImage}
+                  className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  ⚙️ แปลงข้อมูลเป็นรูปภาพ (คมชัด 4K)
+                </button>
+              ) : (
+                <button 
+                  onClick={() => downloadImage(generatedPromoUrl, `Leaderboard_Landscape_4K_${Date.now()}.png`)}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  📥 ดาวน์โหลดภาพความละเอียดสูง
+                </button>
+              )}
               <button 
                 onClick={() => setShowPromoModal(false)} 
                 className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2.5 rounded-xl font-bold transition cursor-pointer"
@@ -490,78 +535,99 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างสร้างรูปโปรโมท "แยกรายทีม" (ทุกคนทำได้ และพื้นหลังเป็นโลโก้ทีม) ================= */}
+      {/* ================= MODAL: หน้าต่างสร้างรูปโปรโมท "แยกรายทีม" ================= */}
       {promoTeamTarget && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
-              <h3 className="font-bold text-sky-400 text-sm">🖼️ รูปโปรโมททีม: [{promoTeamTarget.tag}] {promoTeamTarget.name}</h3>
-              <button onClick={() => setPromoTeamTarget(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
+              <h3 className="font-bold text-sky-400 text-sm">🖼️️ รูปโปรโมททีม: [{promoTeamTarget.tag}] {promoTeamTarget.name}</h3>
+              <button onClick={() => { setPromoTeamTarget(null); setGeneratedSingleTeamUrl(null); }} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
             <div className="overflow-y-auto space-y-3 pr-1 flex-1">
-              <div 
-                ref={singleTeamPromoRef} 
-                className="bg-zinc-950 p-5 rounded-2xl border-2 border-sky-500/40 space-y-4 shadow-2xl text-white relative overflow-hidden"
-              >
-                {promoTeamTarget.logo_url && (
-                  <div 
-                    className="absolute inset-0 bg-no-repeat bg-center bg-cover opacity-25 pointer-events-none filter blur-[4px] scale-125" 
-                    style={{ backgroundImage: `url(${promoTeamTarget.logo_url})` }}
+              {generatedSingleTeamUrl ? (
+                <div className="space-y-2 text-center">
+                  <p className="text-[10px] text-emerald-400 font-bold">✨ สร้างรูปสำเร็จ! คลิกที่รูปเพื่อขยายดูภาพขนาดเต็ม</p>
+                  <img 
+                    src={generatedSingleTeamUrl} 
+                    alt="Team Promo" 
+                    onClick={() => setPreviewImage({ url: generatedSingleTeamUrl, title: `ทีม ${promoTeamTarget.name} (ขนาดเต็ม)` })}
+                    className="w-full rounded-xl border border-sky-500/50 cursor-pointer shadow-2xl hover:opacity-95 transition"
                   />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black/95 pointer-events-none" />
-
-                <div className="relative z-10 flex items-center gap-4 border-b border-zinc-800 pb-3">
-                  {promoTeamTarget.logo_url ? (
-                    <img src={promoTeamTarget.logo_url} alt="" className="w-16 h-16 object-contain rounded-2xl bg-zinc-900/90 p-2 border border-zinc-700 shadow-xl" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">ไม่มีโลโก้</div>
+                </div>
+              ) : (
+                <div 
+                  ref={singleTeamPromoRef} 
+                  className="bg-zinc-950 p-5 rounded-2xl border-2 border-sky-500/40 space-y-4 shadow-2xl text-white relative overflow-hidden"
+                >
+                  {promoTeamTarget.logo_url && (
+                    <div 
+                      className="absolute inset-0 bg-no-repeat bg-center bg-cover opacity-25 pointer-events-none filter blur-[4px] scale-125" 
+                      style={{ backgroundImage: `url(${promoTeamTarget.logo_url})` }}
+                    />
                   )}
-                  <div>
-                    <span className="text-[10px] font-black bg-sky-500/30 text-sky-300 px-2.5 py-0.5 rounded border border-sky-500/50 inline-block mb-1">[{promoTeamTarget.tag}]</span>
-                    <h2 className="text-lg font-black text-white">{promoTeamTarget.name}</h2>
-                    <p className="text-[10px] text-zinc-300">คะแนนรวม: <strong className="text-sky-400">{promoTeamTarget.totalPts} Pts</strong> | AVG: <strong className="text-emerald-400">{promoTeamTarget.avgPts}</strong></p>
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black/95 pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center gap-4 border-b border-zinc-800 pb-3">
+                    {promoTeamTarget.logo_url ? (
+                      <img src={promoTeamTarget.logo_url} alt="" className="w-16 h-16 object-contain rounded-2xl bg-zinc-900/90 p-2 border border-zinc-700 shadow-xl" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">ไม่มีโลโก้</div>
+                    )}
+                    <div>
+                      <span className="text-[10px] font-black bg-sky-500/30 text-sky-300 px-2.5 py-0.5 rounded border border-sky-500/50 inline-block mb-1">[{promoTeamTarget.tag}]</span>
+                      <h2 className="text-lg font-black text-white">{promoTeamTarget.name}</h2>
+                      <p className="text-[10px] text-zinc-300">คะแนนรวม: <strong className="text-sky-400">{promoTeamTarget.totalPts} Pts</strong> | AVG: <strong className="text-emerald-400">{promoTeamTarget.avgPts}</strong></p>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 space-y-2">
+                    <h4 className="text-[11px] font-bold text-zinc-300">Player Roster & KDA Stats:</h4>
+                    {promoTeamTarget.allRoster.length === 0 ? (
+                      <p className="text-[10px] text-zinc-500 italic text-center py-2">ยังไม่มีผู้เล่นในทีมนี้</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {promoTeamTarget.allRoster.map((p: any) => (
+                          <div key={p.id} className="bg-black/85 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-xs shadow">
+                            <div>
+                              <span className="text-[9px] text-sky-400 font-bold uppercase block">{p.role} {p.is_resting ? '(พักแข่ง)' : ''}</span>
+                              <span className="font-bold text-white text-xs">{p.ign}</span>
+                            </div>
+                            <div className="text-right bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                              <span className="text-[8px] text-amber-400 block font-bold">KDA</span>
+                              <strong className="text-amber-400 text-xs font-black">{p.kda}</strong>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-400 relative z-10">
+                    iSOTOPE ESPORTS | Sponsor By CONYSWEET
                   </div>
                 </div>
-
-                <div className="relative z-10 space-y-2">
-                  <h4 className="text-[11px] font-bold text-zinc-300">Player Roster & KDA Stats:</h4>
-                  {promoTeamTarget.allRoster.length === 0 ? (
-                    <p className="text-[10px] text-zinc-500 italic text-center py-2">ยังไม่มีผู้เล่นในทีมนี้</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {promoTeamTarget.allRoster.map((p: any) => (
-                        <div key={p.id} className="bg-black/85 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-xs shadow">
-                          <div>
-                            <span className="text-[9px] text-sky-400 font-bold uppercase block">{p.role} {p.is_resting ? '(พักแข่ง)' : ''}</span>
-                            <span className="font-bold text-white text-xs">{p.ign}</span>
-                          </div>
-                          <div className="text-right bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30">
-                            <span className="text-[8px] text-amber-400 block font-bold">KDA</span>
-                            <strong className="text-amber-400 text-xs font-black">{p.kda}</strong>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-400 relative z-10">
-                  iSOTOPE ESPORTS | Sponsor By CONYSWEET
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="shrink-0 pt-2 border-t border-zinc-800 flex gap-2">
+              {!generatedSingleTeamUrl ? (
+                <button 
+                  onClick={handleGenerateSingleTeamImage}
+                  className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  ⚙️ แปลงข้อมูลเป็นรูปภาพ
+                </button>
+              ) : (
+                <button 
+                  onClick={() => downloadImage(generatedSingleTeamUrl, `Team_${promoTeamTarget?.tag || 'Profile'}_${Date.now()}.png`)}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  📥 ดาวน์โหลดรูปภาพ
+                </button>
+              )}
               <button 
-                onClick={handleDownloadSingleTeamImage}
-                className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
-              >
-                📥 ดาวน์โหลดรูปโปรโมททีมนี้
-              </button>
-              <button 
-                onClick={() => setPromoTeamTarget(null)} 
+                onClick={() => { setPromoTeamTarget(null); setGeneratedSingleTeamUrl(null); }} 
                 className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2.5 rounded-xl font-bold transition cursor-pointer"
               >
                 ปิด
@@ -657,7 +723,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* ================= MODAL: หน้าจัดการทีม (เพิ่มปุ่มทำรูปโปรโมทไว้ข้างใน) ================= */}
+      {/* ================= MODAL: หน้าจัดการทีม ================= */}
       {activeSelectedTeam && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/40 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -674,16 +740,16 @@ export default function Home() {
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
-            {/* 🌟 ปุ่มทำรูปโปรโมทประจำทีม (อยู่ข้างใน ทุกคนกดได้) */}
             <button 
               onClick={() => {
                 const target = activeSelectedTeam;
                 setSelectedTeam(null);
+                setGeneratedSingleTeamUrl(null);
                 setPromoTeamTarget(target);
               }}
               className="w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 py-2 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow"
             >
-              🖼️ สร้างรูปโปรโมททีมนี้ (ดาวน์โหลดไปโพสต์)
+              🖼️ สร้างรูปโปรโมททีมนี้ (ดูภาพขนาดเต็ม)
             </button>
 
             {/* รายชื่อผู้เล่น */}
@@ -864,7 +930,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างดูประวัติส่วนตัวของผู้เล่น (เลื่อน Scroll ได้) ================= */}
+      {/* ================= MODAL: หน้าต่างดูประวัติส่วนตัวของผู้เล่น ================= */}
       {selectedPlayerForHistory && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
@@ -1094,15 +1160,30 @@ export default function Home() {
         </div>
       )}
 
+      {/* ================= POPUP ขยายภาพขนาดใหญ่สุดคมชัดแบบเต็มจอ ================= */}
       {previewImage && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="relative max-w-lg w-full flex flex-col items-center space-y-3">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="relative max-w-6xl w-full flex flex-col items-center space-y-3">
             <div className="w-full flex justify-between items-center px-1">
-              <span className="text-sky-400 font-bold text-xs">{previewImage.title}</span>
-              <button onClick={() => setPreviewImage(null)} className="bg-zinc-800 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center cursor-pointer">✕</button>
+              <span className="text-sky-400 font-bold text-xs">{previewImage.title} (คุณสามารถซูมดูรายละเอียดแบบชัดๆ ได้เต็มที่)</span>
+              <button onClick={() => setPreviewImage(null)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center cursor-pointer">✕</button>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-2xl max-h-[80vh] flex items-center justify-center w-full">
-              <img src={previewImage.url} alt="Preview" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+            <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-2xl shadow-2xl max-h-[85vh] flex items-center justify-center w-full overflow-auto">
+              <img src={previewImage.url} alt="Preview 4K Full" className="max-w-none object-contain rounded-xl shadow-2xl" />
+            </div>
+            <div className="w-full flex gap-2">
+              <button 
+                onClick={() => downloadImage(previewImage.url, `Landscape_Promo_4K_${Date.now()}.png`)}
+                className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+              >
+                📥 บันทึกภาพความละเอียดสูงลงเครื่อง
+              </button>
+              <button 
+                onClick={() => setPreviewImage(null)} 
+                className="bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                ปิด
+              </button>
             </div>
           </div>
         </div>
