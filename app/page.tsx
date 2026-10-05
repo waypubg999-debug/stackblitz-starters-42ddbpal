@@ -326,7 +326,6 @@ export default function Home() {
     return t.name.toLowerCase().includes(teamSearchQuery.toLowerCase().trim()) || t.tag.toLowerCase().includes(teamSearchQuery.toLowerCase().trim());
   });
 
-  // 🌟 จัดเรียงทีมตามคะแนนสะสม (totalPts) จากมากไปน้อย โดยไม่มีการแสดงเลขอันดับ
   const rankedTeams = [...filteredTeams].sort((a, b) => b.totalPts - a.totalPts);
   const activeSelectedTeam = selectedTeam ? teamsWithDetails.find(t => String(t.id) === String(selectedTeam.id)) : null;
 
@@ -421,7 +420,7 @@ export default function Home() {
           className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 transition"
         />
 
-        <div className="space-y-5">
+        <div className="space-y-3">
           {rankedTeams.length === 0 ? (
             <div className="bg-zinc-900/40 p-10 rounded-3xl border border-zinc-800 text-center text-xs text-zinc-400">ไม่พบข้อมูล Team</div>
           ) : (
@@ -429,27 +428,27 @@ export default function Home() {
               <div 
                 key={t.id} 
                 onClick={() => setSelectedTeam(t)}
-                className="p-6 rounded-3xl border-2 border-zinc-800 relative overflow-hidden shadow-2xl bg-zinc-950 cursor-pointer hover:border-sky-500 transition group"
+                className="p-3 rounded-2xl border-2 border-zinc-800 relative overflow-hidden shadow-xl bg-zinc-950 cursor-pointer hover:border-sky-500 transition group"
               >
                 {t.logo_url && (
                   <div 
-                    className="absolute inset-0 bg-no-repeat bg-right bg-cover opacity-35 pointer-events-none filter blur-[1px] scale-125" 
+                    className="absolute inset-0 bg-no-repeat bg-right bg-cover opacity-25 pointer-events-none filter blur-[1px] scale-125" 
                     style={{ backgroundImage: `url(${t.logo_url})` }}
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/20 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/40 pointer-events-none" />
 
-                <div className="relative z-10 flex items-center justify-between py-2 gap-4">
-                  <div className="flex items-center gap-5 min-w-0 flex-1">
+                <div className="relative z-10 flex items-center justify-between py-1 gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     {t.logo_url ? (
-                      <img src={t.logo_url} alt={t.name} onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `[${t.tag}] ${t.name}` }); }} className="w-20 h-20 object-contain rounded-2xl bg-zinc-950/80 p-2 border-2 border-zinc-700/80 shrink-0 cursor-pointer shadow-2xl" />
+                      <img src={t.logo_url} alt={t.name} onClick={(e) => { e.stopPropagation(); setPreviewImage({ url: t.logo_url, title: `[${t.tag}] ${t.name}` }); }} className="w-12 h-12 object-contain rounded-xl bg-zinc-950/90 p-1.5 border border-zinc-700/80 shrink-0 cursor-pointer shadow-lg" />
                     ) : (
-                      <div className="w-20 h-20 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-center text-xs text-zinc-500 shrink-0">ไม่มีโลโก้</div>
+                      <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500 shrink-0">ไม่มีโลโก้</div>
                     )}
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <span className="text-[10px] font-black bg-sky-500/30 text-sky-300 px-2.5 py-0.5 rounded-lg border border-sky-500/50 inline-block">[{t.tag}]</span>
-                      <h3 className="font-black text-xl text-white drop-shadow-xl truncate group-hover:text-sky-400 transition">{t.name}</h3>
-                      <div className="text-[10px] text-zinc-300 flex gap-3 pt-1">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <span className="text-[9px] font-black bg-sky-500/30 text-sky-300 px-2 py-0.2 rounded border border-sky-500/50 inline-block">[{t.tag}]</span>
+                      <h3 className="font-black text-sm text-white drop-shadow truncate group-hover:text-sky-400 transition">{t.name}</h3>
+                      <div className="text-[10px] text-zinc-300 flex gap-2.5">
                         <span>คะแนนรวม: <strong className="text-sky-400">{t.totalPts}</strong></span>
                         <span>AVG: <strong className="text-emerald-400">{t.avgPts}</strong></span>
                         <span>ผู้เล่น: <strong className="text-white">{t.roster.length} คน</strong></span>
@@ -459,7 +458,7 @@ export default function Home() {
 
                   {isAdmin && (
                     <div className="shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-xs bg-red-500/20 text-red-400 p-2.5 rounded-xl border border-red-500/30 hover:bg-red-500/30 shadow-lg cursor-pointer">ลบ</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-[10px] bg-red-500/20 text-red-400 px-2.5 py-1.5 rounded-lg border border-red-500/30 hover:bg-red-500/30 shadow cursor-pointer">ลบ</button>
                     </div>
                   )}
                 </div>
