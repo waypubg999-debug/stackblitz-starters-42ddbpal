@@ -37,8 +37,7 @@ export default function Home() {
 
   const [showBatchScoreModal, setShowBatchScoreModal] = useState(false);
   const [selectedScrimSessionId, setSelectedScrimSessionId] = useState<string>('');
-  const [selectedTargetGameNo, setSelectedTargetGameNo] = useState<number>(1);
-  const [batchPlayerScores, setBatchPlayerScores] = useState<{ [playerId: string]: { kills: number; assists: number; damage: number; survived: number; rescue: number } }>({});
+  const [batchPlayerScores, setBatchPlayerScores] = useState<{ [playerId: string]: { [gameNo: number]: { kills: number | ''; assists: number | ''; damage: number | ''; survived: number | ''; rescue: number | '' } } }>({});
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [activeHistoryScrim, setActiveHistoryScrim] = useState<any | null>(null);
@@ -73,22 +72,25 @@ export default function Home() {
     if (!showBatchScoreModal || !selectedScrimSessionId || !selectedTeam) return;
 
     const sessionLogs = allScoreHistory.filter(
-      h => String(h.scrim_session_id) === String(selectedScrimSessionId) && Number(h.game_no) === Number(selectedTargetGameNo)
+      h => String(h.scrim_session_id) === String(selectedScrimSessionId)
     );
 
     const initialScores: any = {};
     selectedTeam.roster.forEach((player: any) => {
-      const existingLog = sessionLogs.find(l => String(l.player_id) === String(player.id));
-      initialScores[player.id] = {
-        kills: existingLog ? Number(existingLog.kills) || 0 : 0,
-        assists: existingLog ? Number(existingLog.assists) || 0 : 0,
-        damage: existingLog ? Number(existingLog.damage) || 0 : 0,
-        survived: existingLog ? Number(existingLog.survived) || 0 : 0,
-        rescue: existingLog ? Number(existingLog.rescue) || 0 : 0,
-      };
+      initialScores[player.id] = {};
+      for (let g = 1; g <= 6; g++) {
+        const existingLog = sessionLogs.find(l => String(l.player_id) === String(player.id) && Number(l.game_no) === g);
+        initialScores[player.id][g] = {
+          kills: existingLog && existingLog.kills !== null && existingLog.kills !== undefined ? Number(existingLog.kills) : '',
+          assists: existingLog && existingLog.assists !== null && existingLog.assists !== undefined ? Number(existingLog.assists) : '',
+          damage: existingLog && existingLog.damage !== null && existingLog.damage !== undefined ? Number(existingLog.damage) : '',
+          survived: existingLog && existingLog.survived !== null && existingLog.survived !== undefined ? Number(existingLog.survived) : '',
+          rescue: existingLog && existingLog.rescue !== null && existingLog.rescue !== undefined ? Number(existingLog.rescue) : '',
+        };
+      }
     });
     setBatchPlayerScores(initialScores);
-  }, [selectedScrimSessionId, selectedTargetGameNo, showBatchScoreModal]);
+  }, [selectedScrimSessionId, showBatchScoreModal]);
 
   async function fetchAllData() {
     try {
@@ -327,80 +329,78 @@ export default function Home() {
     if (!requireAdmin()) return;
     if (!selectedScrimSessionId) return alert('กรุณาเลือกห้องซ้อม/แมตช์ที่ต้องการอ้างอิงก่อน');
 
-    const targetScrim = team.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
-    const maxScrimKills = Number(targetScrim?.kill_points) || 0;
-    const totalInputKills = Object.values(batchPlayerScores).reduce((sum, p) => sum + (Number(p.kills) || 0), 0);
-
-    if (maxScrimKills > 0 && totalInputKills > maxScrimKills) {
-      alert(`คะแนนคิลรวมของผู้เล่นทุกคน (${totalInputKills}) ห้ามเกินคะแนนคิลของห้องซ้อมนี้ (${maxScrimKills} คิล)`);
-      return;
-    }
-
     try {
       for (const player of team.roster) {
-        const stats = batchPlayerScores[player.id];
-        if (stats) {
+        const playerGames = batchPlayerScores[player.id];
+        if (!playerGames) continue;
+
+        for (let g = 1; g <= 6; g++) {
+          const gStats = playerGames[g];
+          const hasInput = gStats && gStats.kills !== '' && gStats.kills !== undefined && Number(gStats.kills) >= 0;
+
           const { data: existingLog } = await supabase
             .from('player_score_history')
             .select('*')
             .eq('scrim_session_id', String(selectedScrimSessionId))
             .eq('player_id', String(player.id))
-            .eq('game_no', Number(selectedTargetGameNo))
+            .eq('game_no', g)
             .maybeSingle();
 
-          const oldKills = existingLog ? Number(existingLog.kills) || 0 : 0;
-          const oldAssists = existingLog ? Number(existingLog.assists) || 0 : 0;
-          const oldDamage = existingLog ? Number(existingLog.damage) || 0 : 0;
-          const oldSurvived = existingLog ? Number(existingLog.survived) || 0 : 0;
-          const oldRescue = existingLog ? Number(existingLog.rescue) || 0 : 0;
-
-          const newKills = (Number(player.total_kills) || 0) - oldKills + (Number(stats.kills) || 0);
-          const newAssists = (Number(player.Assists) || 0) - oldAssists + (Number(stats.assists) || 0);
-          const newDamage = (Number(player.Damage) || 0) - oldDamage + (Number(stats.damage) || 0);
-          const newSurvived = (Number(player.Survived) || 0) - oldSurvived + (Number(stats.survived) || 0);
-          const newRescue = (Number(player.Rescue) || 0) - oldRescue + (Number(stats.rescue) || 0);
-          const newMatches = (Number(player.total_matches) || 0) + (existingLog ? 0 : 1);
-
-          await supabase.from('players').update({
-            total_matches: newMatches,
-            total_kills: newKills,
-            Assists: newAssists,
-            Damage: newDamage,
-            Survived: newSurvived,
-            Rescue: newRescue,
-            last_scrim_session_id: String(selectedScrimSessionId)
-          }).eq('id', player.id);
-
-          if (existingLog) {
-            await supabase.from('player_score_history').update({
-              kills: Number(stats.kills) || 0,
-              assists: Number(stats.assists) || 0,
-              damage: Number(stats.damage) || 0,
-              survived: Number(stats.survived) || 0,
-              rescue: Number(stats.rescue) || 0,
-            }).eq('id', existingLog.id);
+          if (!hasInput) {
+            if (existingLog) {
+              await supabase.from('player_score_history').delete().eq('id', existingLog.id);
+            }
           } else {
-            await supabase.from('player_score_history').insert([{
-              scrim_session_id: String(selectedScrimSessionId),
-              team_id: team.id,
-              player_id: player.id,
-              ign: player.ign,
-              matches: 1,
-              kills: Number(stats.kills) || 0,
-              assists: Number(stats.assists) || 0,
-              damage: Number(stats.damage) || 0,
-              survived: Number(stats.survived) || 0,
-              rescue: Number(stats.rescue) || 0,
-              game_no: Number(selectedTargetGameNo)
-            }]);
+            const k = Number(gStats.kills) || 0;
+            const a = Number(gStats.assists) || 0;
+            const d = Number(gStats.damage) || 0;
+            const s = Number(gStats.survived) || 0;
+            const r = Number(gStats.rescue) || 0;
+
+            if (existingLog) {
+              await supabase.from('player_score_history').update({
+                kills: k, assists: a, damage: d, survived: s, rescue: r
+              }).eq('id', existingLog.id);
+            } else {
+              await supabase.from('player_score_history').insert([{
+                scrim_session_id: String(selectedScrimSessionId),
+                team_id: team.id,
+                player_id: player.id,
+                ign: player.ign,
+                matches: 1,
+                kills: k, assists: a, damage: d, survived: s, rescue: r,
+                game_no: g
+              }]);
+            }
           }
         }
+
+        const { data: allPlayerLogs } = await supabase
+          .from('player_score_history')
+          .select('*')
+          .eq('player_id', String(player.id));
+
+        const actualTotalMatches = allPlayerLogs ? allPlayerLogs.length : 0;
+        const actualTotalKills = (allPlayerLogs || []).reduce((sum, l) => sum + (Number(l.kills) || 0), 0);
+        const actualTotalAssists = (allPlayerLogs || []).reduce((sum, l) => sum + (Number(l.assists) || 0), 0);
+        const actualTotalDamage = (allPlayerLogs || []).reduce((sum, l) => sum + (Number(l.damage) || 0), 0);
+        const actualTotalSurvived = (allPlayerLogs || []).reduce((sum, l) => sum + (Number(l.survived) || 0), 0);
+        const actualTotalRescue = (allPlayerLogs || []).reduce((sum, l) => sum + (Number(l.rescue) || 0), 0);
+
+        await supabase.from('players').update({
+          total_matches: actualTotalMatches,
+          total_kills: actualTotalKills,
+          Assists: actualTotalAssists,
+          Damage: actualTotalDamage,
+          Survived: actualTotalSurvived,
+          Rescue: actualTotalRescue,
+          last_scrim_session_id: String(selectedScrimSessionId)
+        }).eq('id', player.id);
       }
 
-      alert(`บันทึกคะแนน เกมที่ ${selectedTargetGameNo} สำเร็จ`);
+      alert('บันทึกคะแนนผู้เล่นทั้ง 6 เกมสำเร็จเรียบร้อย');
       setShowBatchScoreModal(false);
       setBatchPlayerScores({});
-      
       await fetchAllData();
 
       const { data: tData } = await supabase.from('teams').select('*');
@@ -1023,23 +1023,11 @@ export default function Home() {
                     <button 
                       onClick={() => {
                         setSelectedScrimSessionId(selectedTeam.scrimHistory[selectedTeam.scrimHistory.length - 1]?.id || '');
-                        setSelectedTargetGameNo(1);
-                        const initialScores: any = {};
-                        selectedTeam.roster.forEach((p: any) => {
-                          initialScores[p.id] = {
-                            kills: 0,
-                            assists: 0,
-                            damage: 0,
-                            survived: 0,
-                            rescue: 0
-                          };
-                        });
-                        setBatchPlayerScores(initialScores);
                         setShowBatchScoreModal(true);
                       }} 
                       className="bg-sky-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow"
                     >
-                      กรอกคะแนนผู้เล่นทั้งทีม
+                      กรอกคะแนนผู้เล่นทั้งทีม (6 เกมรวด)
                     </button>
                   )}
                 </div>
@@ -1173,12 +1161,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: BATCH PLAYER SCORES ================= */}
+      {/* ================= MODAL: BATCH PLAYER SCORES (6 เกมรวด) ================= */}
       {showBatchScoreModal && selectedTeam && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 text-xs">
-          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-lg rounded-2xl p-4 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-              <h3 className="font-bold text-sky-400 text-sm">กรอกคะแนนผู้เล่นทั้งทีม: [{selectedTeam.tag}]</h3>
+              <h3 className="font-bold text-sky-400 text-sm">กรอกคะแนนผู้เล่น 6 เกม (รายคน): [{selectedTeam.tag}]</h3>
               <button onClick={() => setShowBatchScoreModal(false)} className="text-zinc-400 hover:text-white font-bold text-base">✕</button>
             </div>
 
@@ -1189,107 +1177,117 @@ export default function Home() {
                 onChange={(e) => setSelectedScrimSessionId(e.target.value)} 
                 className="w-full bg-black border border-zinc-700 p-2 rounded-xl text-xs text-white"
               >
-                {selectedTeam.scrimHistory.map((s: any, idx: number) => {
-                  const sessionLogs = allScoreHistory.filter(h => String(h.scrim_session_id) === String(s.id));
-                  const uniqueCount = new Set(sessionLogs.map(h => h.game_no)).size;
-                  return (
-                    <option key={s.id} value={s.id}>
-                      #{idx + 1} - {s.scrim_name} (กรอกแล้ว {uniqueCount}/6 ครั้ง)
-                    </option>
-                  );
-                })}
+                {selectedTeam.scrimHistory.map((s: any, idx: number) => (
+                  <option key={s.id} value={s.id}>
+                    #{idx + 1} - {s.scrim_name}
+                  </option>
+                ))}
               </select>
-
-              <div className="pt-1">
-                <label className="text-[10px] text-sky-400 font-bold block">เลือกเกมที่กำลังจะกรอกคะแนน:</label>
-                <select 
-                  value={selectedTargetGameNo} 
-                  onChange={(e) => setSelectedTargetGameNo(Number(e.target.value))} 
-                  className="w-full bg-black border border-sky-500/50 p-2 rounded-xl text-xs text-sky-300 font-bold"
-                >
-                  <option value={1}>เกมที่ 1</option>
-                  <option value={2}>เกมที่ 2</option>
-                  <option value={3}>เกมที่ 3</option>
-                  <option value={4}>เกมที่ 4</option>
-                  <option value={5}>เกมที่ 5</option>
-                  <option value={6}>เกมที่ 6</option>
-                </select>
-              </div>
+              <p className="text-[10px] text-zinc-500 italic">* คนไหนไม่ได้ลงแข่งในเกมไหน ให้เว้นช่องว่างไว้ จำนวนเกมจะไม่ถูกนับเพิ่ม</p>
             </div>
 
-            {(() => {
-              const currentScrim = selectedTeam.scrimHistory.find((s: any) => String(s.id) === String(selectedScrimSessionId));
-              const maxKills = currentScrim ? Number(currentScrim.kill_points) || 0 : 0;
-              const inputSumKills = Object.values(batchPlayerScores).reduce((sum: number, p: any) => sum + (Number(p.kills) || 0), 0);
-              const isOver = maxKills > 0 && inputSumKills > maxKills;
-
-              return (
-                <div className="space-y-2">
-                  <div className={`p-2 rounded-xl text-[10px] flex justify-between items-center border ${isOver ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-sky-500/10 border-sky-500/30 text-sky-300'}`}>
-                    <span>เป้าหมายคิลห้องซ้อมนี้: <strong>{maxKills > 0 ? `${maxKills} คิล` : 'ไม่จำกัด'}</strong></span>
-                    <span>กรอกแล้วรวม: <strong className={isOver ? 'text-red-400 font-black text-xs' : 'text-white'}>{inputSumKills}</strong> คิล</span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="space-y-3 pt-1">
+            <div className="space-y-4 pt-2">
               {[...selectedTeam.roster].sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' })).map((player: any) => {
-                const pScore = batchPlayerScores[player.id] || { kills: 0, assists: 0, damage: 0, survived: 0, rescue: 0 };
+                const playerGames = batchPlayerScores[player.id] || {};
                 return (
-                  <div key={player.id} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
-                    <div className="flex items-center gap-2 border-b border-zinc-900 pb-1.5">
+                  <div key={player.id} className="bg-black p-3 rounded-xl border border-zinc-800 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-zinc-900 pb-2">
                       {player.avatar_url && <img src={player.avatar_url} alt={player.ign} className="w-6 h-6 object-cover rounded bg-zinc-950" />}
                       <span className="font-bold text-white text-xs">{player.ign}</span>
                       <span className="text-[9px] text-sky-400 bg-zinc-900 px-1.5 py-0.5 rounded ml-auto">{player.role}</span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                      <div>
-                        <span className="text-zinc-400 block text-[9px]">คิล (Kills)</span>
-                        <input 
-                          type="number" 
-                          value={pScore.kills} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, kills: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center font-bold text-sky-400" 
-                        />
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px]">แอสซิสต์</span>
-                        <input 
-                          type="number" 
-                          value={pScore.assists} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, assists: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
-                        />
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px]">ดาเมจ</span>
-                        <input 
-                          type="number" 
-                          value={pScore.damage} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, damage: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
-                        />
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px]">รอดชีวิต</span>
-                        <input 
-                          type="number" 
-                          value={pScore.survived} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, survived: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-zinc-400 block text-[9px]">ช่วยเพื่อน</span>
-                        <input 
-                          type="number" 
-                          value={pScore.rescue} 
-                          onChange={(e) => setBatchPlayerScores({ ...batchPlayerScores, [player.id]: { ...pScore, rescue: Number(e.target.value) } })} 
-                          className="w-full bg-zinc-900 p-1 rounded text-white border border-zinc-700 text-center" 
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5, 6].map((gNo) => {
+                        const gStats = playerGames[gNo] || { kills: '', assists: '', damage: '', survived: '', rescue: '' };
+                        return (
+                          <div key={gNo} className="bg-zinc-950 p-2 rounded-lg border border-zinc-900 flex items-center justify-between gap-2 text-[10px]">
+                            <span className="text-sky-400 font-bold shrink-0 w-12">เกม {gNo}</span>
+                            <div className="grid grid-cols-5 gap-1 flex-1">
+                              <input 
+                                type="number" 
+                                placeholder="คิล" 
+                                value={gStats.kills} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBatchPlayerScores({
+                                    ...batchPlayerScores,
+                                    [player.id]: {
+                                      ...playerGames,
+                                      [gNo]: { ...gStats, kills: val === '' ? '' : Number(val) }
+                                    }
+                                  });
+                                }} 
+                                className="bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center font-bold text-sky-400 placeholder-zinc-600" 
+                              />
+                              <input 
+                                type="number" 
+                                placeholder="แอส" 
+                                value={gStats.assists} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBatchPlayerScores({
+                                    ...batchPlayerScores,
+                                    [player.id]: {
+                                      ...playerGames,
+                                      [gNo]: { ...gStats, assists: val === '' ? '' : Number(val) }
+                                    }
+                                  });
+                                }} 
+                                className="bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center placeholder-zinc-600" 
+                              />
+                              <input 
+                                type="number" 
+                                placeholder="ดาเมจ" 
+                                value={gStats.damage} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBatchPlayerScores({
+                                    ...batchPlayerScores,
+                                    [player.id]: {
+                                      ...playerGames,
+                                      [gNo]: { ...gStats, damage: val === '' ? '' : Number(val) }
+                                    }
+                                  });
+                                }} 
+                                className="bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center placeholder-zinc-600" 
+                              />
+                              <input 
+                                type="number" 
+                                placeholder="รอด" 
+                                value={gStats.survived} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBatchPlayerScores({
+                                    ...batchPlayerScores,
+                                    [player.id]: {
+                                      ...playerGames,
+                                      [gNo]: { ...gStats, survived: val === '' ? '' : Number(val) }
+                                    }
+                                  });
+                                }} 
+                                className="bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center placeholder-zinc-600" 
+                              />
+                              <input 
+                                type="number" 
+                                placeholder="ช่วย" 
+                                value={gStats.rescue} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBatchPlayerScores({
+                                    ...batchPlayerScores,
+                                    [player.id]: {
+                                      ...playerGames,
+                                      [gNo]: { ...gStats, rescue: val === '' ? '' : Number(val) }
+                                    }
+                                  });
+                                }} 
+                                className="bg-zinc-900 p-1 rounded text-white border border-zinc-800 text-center placeholder-zinc-600" 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1298,9 +1296,9 @@ export default function Home() {
 
             <button 
               onClick={() => handleSaveBatchPlayerScores(selectedTeam)} 
-              className="w-full font-bold py-2 rounded-xl text-xs mt-2 transition shadow-lg bg-sky-500 hover:bg-sky-400 text-black"
+              className="w-full font-bold py-2.5 rounded-xl text-xs mt-2 transition shadow-lg bg-sky-500 hover:bg-sky-400 text-black"
             >
-              บันทึกคะแนนผู้เล่นทั้งทีม
+              บันทึกคะแนนผู้เล่นทั้ง 6 เกมทันที
             </button>
           </div>
         </div>
