@@ -326,7 +326,8 @@ export default function Home() {
     return t.name.toLowerCase().includes(teamSearchQuery.toLowerCase().trim()) || t.tag.toLowerCase().includes(teamSearchQuery.toLowerCase().trim());
   });
 
-  const rankedTeams = [...filteredTeams].sort((a, b) => a.name.localeCompare(b.name));
+  // 🌟 จัดเรียงทีมตามคะแนนสะสม (totalPts) จากมากไปน้อย โดยไม่มีการแสดงเลขอันดับ
+  const rankedTeams = [...filteredTeams].sort((a, b) => b.totalPts - a.totalPts);
   const activeSelectedTeam = selectedTeam ? teamsWithDetails.find(t => String(t.id) === String(selectedTeam.id)) : null;
 
   return (
@@ -663,12 +664,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างดูประวัติส่วนตัวของผู้เล่น (มีจำนวนเกมรวม) ================= */}
+      {/* ================= MODAL: หน้าต่างดูประวัติส่วนตัวของผู้เล่น (เลื่อน Scroll ได้) ================= */}
       {selectedPlayerForHistory && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
             
-            {/* Header ของ Modal (ไม่เลื่อนตาม) */}
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
               <div>
                 <span className="text-[9px] text-sky-400 font-bold uppercase">{selectedPlayerForHistory.role}</span>
@@ -677,10 +677,8 @@ export default function Home() {
               <button onClick={() => setSelectedPlayerForHistory(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
-            {/* ส่วนเนื้อหาที่สามารถเลื่อน (Scrollable Area) */}
             <div className="overflow-y-auto space-y-3 pr-1">
               
-              {/* 🌟 สรุปสถิติรวม (เพิ่มช่องจำนวนเกมรวมเข้ามาเป็น 5 ช่อง) */}
               <div className="grid grid-cols-5 gap-1.5 text-center bg-black p-2.5 rounded-xl border border-zinc-800">
                 <div className="bg-zinc-950 p-1.5 rounded border border-zinc-900">
                   <span className="text-[8px] text-zinc-400 block">จำนวนเกม</span>
@@ -704,7 +702,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* รายละเอียดประวัติแยกตามห้อง */}
               <div className="space-y-2">
                 <h4 className="text-[11px] font-bold text-zinc-300">ประวัติการลงแข่งแยกตามห้อง:</h4>
                 {selectedPlayerForHistory.gameRecords.length === 0 ? (
@@ -768,7 +765,6 @@ export default function Home() {
 
             </div>
 
-            {/* ปุ่มปิดด้านล่าง (ไม่เลื่อนตาม) */}
             <div className="shrink-0 pt-2 border-t border-zinc-800">
               <button onClick={() => setSelectedPlayerForHistory(null)} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl font-bold transition cursor-pointer">ปิดหน้าต่าง</button>
             </div>
