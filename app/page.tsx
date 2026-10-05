@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import * as htmlToImage from 'html-to-image';
 
 export default function Home() {
   const [teamSearchQuery, setTeamSearchQuery] = useState<string>('');
@@ -37,6 +38,11 @@ export default function Home() {
   const [playerGameStats, setPlayerGameStats] = useState<{ [playerId: string]: { kills: number | ''; assists: number | ''; damage: number | '' } }>({});
 
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  
+  const [promoTeamTarget, setPromoTeamTarget] = useState<any | null>(null);
+  const promoRef = useRef<HTMLDivElement>(null);
+  const singleTeamPromoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchAllData();
@@ -329,6 +335,32 @@ export default function Home() {
   const rankedTeams = [...filteredTeams].sort((a, b) => b.totalPts - a.totalPts);
   const activeSelectedTeam = selectedTeam ? teamsWithDetails.find(t => String(t.id) === String(selectedTeam.id)) : null;
 
+  async function handleDownloadPromoImage() {
+    if (!promoRef.current) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(promoRef.current, { cacheBust: true, quality: 0.95 });
+      const link = document.createElement('a');
+      link.download = `Leaderboard_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      alert('ไม่สามารถสร้างรูปภาพได้: ' + err);
+    }
+  }
+
+  async function handleDownloadSingleTeamImage() {
+    if (!singleTeamPromoRef.current) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(singleTeamPromoRef.current, { cacheBust: true, quality: 0.95 });
+      const link = document.createElement('a');
+      link.download = `Team_${promoTeamTarget?.tag || 'Profile'}_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      alert('ไม่สามารถสร้างรูปภาพทีมได้: ' + err);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-slate-100 font-sans p-4 max-w-md mx-auto border-x border-zinc-900 shadow-2xl relative">
       <header className="py-3 border-b border-zinc-800 mb-4 flex justify-between items-center">
@@ -338,7 +370,15 @@ export default function Home() {
             <span className="text-[10px] text-pink-300">| Sponsor By <span className="text-pink-300 font-bold">CONYSWEET</span></span>
           </div>
         </div>
-        <div>
+        <div className="flex items-center gap-1.5">
+          {isAdmin && (
+            <button
+              onClick={() => setShowPromoModal(true)}
+              className="bg-sky-500 hover:bg-sky-400 text-black text-[9px] px-2 py-1 rounded font-black transition cursor-pointer shadow"
+            >
+              🖼️ โปสเตอร์รวม
+            </button>
+          )}
           {isAdmin ? (
             <button
               onClick={() => {
@@ -347,14 +387,14 @@ export default function Home() {
               }}
               className="bg-emerald-500/25 hover:bg-red-500/25 border border-emerald-500/40 hover:border-red-500/40 text-emerald-400 hover:text-red-400 text-[9px] px-2.5 py-1 rounded font-bold transition cursor-pointer"
             >
-              แอดมิน (คลิกออก)
+              แอดมิน (ออก)
             </button>
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}
               className="bg-zinc-900 hover:bg-zinc-800 text-sky-400 border border-sky-500/30 text-[9px] px-2.5 py-1 rounded font-bold transition cursor-pointer"
             >
-              เข้าสู่ระบบแอดมิน
+              แอดมิน
             </button>
           )}
         </div>
@@ -378,6 +418,155 @@ export default function Home() {
                 <button type="button" onClick={() => setShowLoginModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition cursor-pointer">ยกเลิก</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: หน้าต่างสร้างรูปโปสเตอร์รวมทีม (เฉพาะแอดมิน) ================= */}
+      {isAdmin && showPromoModal && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
+              <h3 className="font-bold text-sky-400 text-sm">🖼️ รูปโปรโมทตารางคะแนนรวม</h3>
+              <button onClick={() => setShowPromoModal(false)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 pr-1 flex-1">
+              <div 
+                ref={promoRef} 
+                className="bg-zinc-950 p-4 rounded-2xl border-2 border-sky-500/40 space-y-3 shadow-2xl text-white relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-b from-sky-500/10 via-transparent to-black/60 pointer-events-none" />
+                
+                <div className="text-center space-y-0.5 relative z-10 border-b border-zinc-800 pb-3">
+                  <h2 className="text-base font-black text-sky-400 tracking-wider">iSOTOPE ESPORTS</h2>
+                  <p className="text-[10px] text-pink-300 font-bold">OVERALL LEADERBOARD STANDINGS</p>
+                  <p className="text-[9px] text-zinc-400">Sponsor By CONYSWEET</p>
+                </div>
+
+                <div className="space-y-1.5 relative z-10">
+                  {teamsWithDetails
+                    .sort((a, b) => b.totalPts - a.totalPts)
+                    .map((t, idx) => (
+                      <div key={t.id} className="bg-black/80 p-2 rounded-xl border border-zinc-800 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-amber-500 text-black' : idx === 1 ? 'bg-zinc-300 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {idx + 1}
+                          </span>
+                          {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 object-contain rounded bg-zinc-900 p-0.5" />}
+                          <div>
+                            <span className="text-[10px] text-sky-400 font-bold">[{t.tag}]</span>
+                            <span className="font-bold text-white text-xs ml-1">{t.name}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-sky-400 text-sm">{t.totalPts} <span className="text-[9px] text-zinc-400">Pts</span></span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-500">
+                  Generated by iSotope Esports Manager System
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 pt-2 border-t border-zinc-800 flex gap-2">
+              <button 
+                onClick={handleDownloadPromoImage}
+                className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+              >
+                📥 ดาวน์โหลดรูปตารางรวม
+              </button>
+              <button 
+                onClick={() => setShowPromoModal(false)} 
+                className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2.5 rounded-xl font-bold transition cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: หน้าต่างสร้างรูปโปรโมท "แยกรายทีม" (ทุกคนทำได้ และพื้นหลังเป็นโลโก้ทีม) ================= */}
+      {promoTeamTarget && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
+          <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
+              <h3 className="font-bold text-sky-400 text-sm">🖼️ รูปโปรโมททีม: [{promoTeamTarget.tag}] {promoTeamTarget.name}</h3>
+              <button onClick={() => setPromoTeamTarget(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 pr-1 flex-1">
+              <div 
+                ref={singleTeamPromoRef} 
+                className="bg-zinc-950 p-5 rounded-2xl border-2 border-sky-500/40 space-y-4 shadow-2xl text-white relative overflow-hidden"
+              >
+                {promoTeamTarget.logo_url && (
+                  <div 
+                    className="absolute inset-0 bg-no-repeat bg-center bg-cover opacity-25 pointer-events-none filter blur-[4px] scale-125" 
+                    style={{ backgroundImage: `url(${promoTeamTarget.logo_url})` }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black/95 pointer-events-none" />
+
+                <div className="relative z-10 flex items-center gap-4 border-b border-zinc-800 pb-3">
+                  {promoTeamTarget.logo_url ? (
+                    <img src={promoTeamTarget.logo_url} alt="" className="w-16 h-16 object-contain rounded-2xl bg-zinc-900/90 p-2 border border-zinc-700 shadow-xl" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">ไม่มีโลโก้</div>
+                  )}
+                  <div>
+                    <span className="text-[10px] font-black bg-sky-500/30 text-sky-300 px-2.5 py-0.5 rounded border border-sky-500/50 inline-block mb-1">[{promoTeamTarget.tag}]</span>
+                    <h2 className="text-lg font-black text-white">{promoTeamTarget.name}</h2>
+                    <p className="text-[10px] text-zinc-300">คะแนนรวม: <strong className="text-sky-400">{promoTeamTarget.totalPts} Pts</strong> | AVG: <strong className="text-emerald-400">{promoTeamTarget.avgPts}</strong></p>
+                  </div>
+                </div>
+
+                <div className="relative z-10 space-y-2">
+                  <h4 className="text-[11px] font-bold text-zinc-300">Player Roster & KDA Stats:</h4>
+                  {promoTeamTarget.allRoster.length === 0 ? (
+                    <p className="text-[10px] text-zinc-500 italic text-center py-2">ยังไม่มีผู้เล่นในทีมนี้</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {promoTeamTarget.allRoster.map((p: any) => (
+                        <div key={p.id} className="bg-black/85 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-xs shadow">
+                          <div>
+                            <span className="text-[9px] text-sky-400 font-bold uppercase block">{p.role} {p.is_resting ? '(พักแข่ง)' : ''}</span>
+                            <span className="font-bold text-white text-xs">{p.ign}</span>
+                          </div>
+                          <div className="text-right bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                            <span className="text-[8px] text-amber-400 block font-bold">KDA</span>
+                            <strong className="text-amber-400 text-xs font-black">{p.kda}</strong>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-400 relative z-10">
+                  iSOTOPE ESPORTS | Sponsor By CONYSWEET
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 pt-2 border-t border-zinc-800 flex gap-2">
+              <button 
+                onClick={handleDownloadSingleTeamImage}
+                className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+              >
+                📥 ดาวน์โหลดรูปโปรโมททีมนี้
+              </button>
+              <button 
+                onClick={() => setPromoTeamTarget(null)} 
+                className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2.5 rounded-xl font-bold transition cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -457,8 +646,8 @@ export default function Home() {
                   </div>
 
                   {isAdmin && (
-                    <div className="shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(t.id, t.name); }} className="text-[10px] bg-red-500/20 text-red-400 px-2.5 py-1.5 rounded-lg border border-red-500/30 hover:bg-red-500/30 shadow cursor-pointer">ลบ</button>
+                    <div className="shrink-0" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handleDeleteTeam(t.id, t.name)} className="text-[10px] bg-red-500/20 text-red-400 px-2.5 py-1.5 rounded-lg border border-red-500/30 hover:bg-red-500/30 shadow cursor-pointer">ลบ</button>
                     </div>
                   )}
                 </div>
@@ -468,7 +657,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* ================= MODAL: หน้าจัดการทีม ================= */}
+      {/* ================= MODAL: หน้าจัดการทีม (เพิ่มปุ่มทำรูปโปรโมทไว้ข้างใน) ================= */}
       {activeSelectedTeam && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/40 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -479,11 +668,23 @@ export default function Home() {
                 )}
                 <div>
                   <h3 className="font-black text-sky-400 text-sm">[{activeSelectedTeam.tag}] {activeSelectedTeam.name}</h3>
-                  <p className="text-[10px] text-zinc-400">คะแนนรวม: <strong className="text-white">{activeSelectedTeam.totalPts}</strong> | AVG ต่อเกม: <strong className="text-emerald-400">{activeSelectedTeam.avgPts}</strong></p>
+                  <p className="text-[10px] text-zinc-400">คะแนนรวม: <strong className="text-white">{activeSelectedTeam.totalPts}</strong> | AVG: <strong className="text-emerald-400">{activeSelectedTeam.avgPts}</strong></p>
                 </div>
               </div>
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
+
+            {/* 🌟 ปุ่มทำรูปโปรโมทประจำทีม (อยู่ข้างใน ทุกคนกดได้) */}
+            <button 
+              onClick={() => {
+                const target = activeSelectedTeam;
+                setSelectedTeam(null);
+                setPromoTeamTarget(target);
+              }}
+              className="w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 py-2 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow"
+            >
+              🖼️ สร้างรูปโปรโมททีมนี้ (ดาวน์โหลดไปโพสต์)
+            </button>
 
             {/* รายชื่อผู้เล่น */}
             <div className="space-y-2">
