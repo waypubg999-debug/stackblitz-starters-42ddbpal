@@ -189,6 +189,38 @@ export default function Home() {
     fetchAllData();
   }
 
+  // 🌟 ฟังก์ชันรีเซตคะแนนรายบุคคล
+  async function handleResetSinglePlayerScores(playerId: string, playerIgn: string) {
+    if (!requireAdmin()) return;
+    if (!confirm(`ต้องการรีเซตสถิติทั้งหมดของ "${playerIgn}" ให้กลับเป็น 0 ใช่หรือไม่?`)) return;
+
+    try {
+      await supabase.from('player_score_history').delete().eq('player_id', String(playerId));
+
+      await supabase.from('players').update({
+        total_matches: 0,
+        total_kills: 0,
+        Assists: 0,
+        Damage: 0,
+        Survived: 0,
+        Rescue: 0,
+        tourney_matches: 0,
+        tourney_kills: 0,
+        tourney_assists: 0,
+        tourney_damage: 0,
+        tourney_survived: 0,
+        tourney_rescue: 0,
+        last_scrim_session_id: null
+      }).eq('id', playerId);
+
+      alert(`รีเซตสถิติของ ${playerIgn} สำเร็จเรียบร้อย`);
+      setSelectedPlayer(null);
+      await fetchAllData();
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+  }
+
   async function handleCreatePlayerForTeam(teamId: string) {
     if (!requireAdmin()) return;
     if (!newTeamPlayerIgn.trim()) return alert('กรุณากรอกชื่อ IGN');
@@ -242,7 +274,7 @@ export default function Home() {
         const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
         const sortedRoster = pData
           .filter((p: any) => String(p.team_id) === String(refreshed.id))
-          .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+          .sort((a: any, b: any) => (b.total_kills || 0) - (a.total_kills || 0));
 
         const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
         const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
@@ -294,7 +326,7 @@ export default function Home() {
         const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshed.id));
         const sortedRoster = pData
           .filter((p: any) => String(p.team_id) === String(refreshed.id))
-          .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+          .sort((a: any, b: any) => (b.total_kills || 0) - (a.total_kills || 0));
 
         const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
         const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
@@ -415,7 +447,7 @@ export default function Home() {
           const teamTourneyScores = (scoreData || []).filter((s: any) => String(s.team_id) === String(refreshedTeam.id));
           const sortedRoster = pData
             .filter((p: any) => String(p.team_id) === String(refreshedTeam.id))
-            .sort((a: any, b: any) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+            .sort((a: any, b: any) => (b.total_kills || 0) - (a.total_kills || 0));
 
           const totalScrimPts = teamScrimScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
           const totalTourneyPts = teamTourneyScores.reduce((sum: number, s: any) => sum + (s.kill_points || 0) + (s.placement_points || 0), 0);
@@ -515,7 +547,7 @@ export default function Home() {
 
     const sortedRoster = players
       .filter(p => String(p.team_id) === String(team.id))
-      .sort((a, b) => a.ign.localeCompare(b.ign, 'en', { sensitivity: 'accent' }));
+      .sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0));
 
     return {
       ...team,
@@ -541,7 +573,6 @@ export default function Home() {
   });
 
   const rankedTeams = [...filteredTeams].sort((a, b) => a.name.localeCompare(b.name));
-  const topPlayers = [...players].sort((a, b) => (b.total_kills || 0) - (a.total_kills || 0)).slice(0, 5);
 
   const renderRadarChart = (matches: number, kills: number, assists: number, damage: number, survived: number, rescue: number) => {
     const m = matches > 1 ? matches : 1;
@@ -644,9 +675,9 @@ export default function Home() {
         {isAdmin && (
           <div className="bg-zinc-900/80 border border-sky-500/30 p-3 rounded-xl space-y-2 mb-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold text-sky-400">Top Players (ผู้เล่นคิลสูงสุด)</h3>
+              <h3 className="text-xs font-bold text-sky-400">จัดการข้อมูลกลาง</h3>
               <button onClick={() => setShowPlayerForm(!showPlayerForm)} className="text-[10px] bg-sky-500 text-black font-bold px-2 py-0.5 rounded">
-                {showPlayerForm ? 'ปิดฟอร์ม' : '+ เพิ่ม Player'}
+                {showPlayerForm ? 'ปิดฟอร์ม' : '+ เพิ่ม Player กลาง'}
               </button>
             </div>
 
@@ -674,31 +705,6 @@ export default function Home() {
                 <button type="submit" className="w-full bg-sky-500 text-black font-bold py-1 rounded">บันทึก Player</button>
               </form>
             )}
-
-            <div className="grid grid-cols-1 gap-1.5 pt-1">
-              {topPlayers.length === 0 ? (
-                <p className="text-[10px] text-zinc-500 text-center italic">ยังไม่มีข้อมูลผู้เล่น</p>
-              ) : (
-                topPlayers.map((p, idx) => {
-                  const tInfo = teams.find(t => String(t.id) === String(p.team_id));
-                  return (
-                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className="bg-black p-2 rounded-lg border border-zinc-800 flex justify-between items-center cursor-pointer hover:border-sky-500 transition">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}>{idx + 1}</span>
-                        {p.avatar_url && <img src={p.avatar_url} alt={p.ign} className="w-7 h-7 object-cover rounded bg-zinc-950 border border-zinc-800" />}
-                        <div>
-                          <span className="text-white font-bold text-xs">{p.ign}</span>
-                          <span className="text-[9px] text-zinc-400 ml-1.5">[{tInfo ? tInfo.tag : 'LFT'}]</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-black text-sky-400">{p.total_kills || 0} Kills</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
           </div>
         )}
 
@@ -1016,9 +1022,34 @@ export default function Home() {
             )}
 
             {teamModalDetailTab === 'roster' && (
-              <div className="space-y-2 pt-1">
-                <div className="flex justify-between items-center">
-                  <p className="text-zinc-300 font-bold">Player ใน Team ({selectedTeam.roster.length}):</p>
+              <div className="space-y-3 pt-1">
+                {/* 🌟 ส่วนแสดง Top Players ประจำทีม (เฉพาะทีมนี้) */}
+                <div className="bg-black p-2.5 rounded-xl border border-sky-500/30 space-y-2">
+                  <h4 className="text-[11px] font-bold text-sky-400 flex items-center justify-between">
+                    <span>🏆 Top Players ประจำทีม</span>
+                    <span className="text-[9px] text-zinc-400">เรียงตามคิลสูงสุด</span>
+                  </h4>
+                  <div className="space-y-1.5">
+                    {selectedTeam.roster.length === 0 ? (
+                      <p className="text-[10px] text-zinc-500 italic text-center py-2">ยังไม่มีผู้เล่นในทีม</p>
+                    ) : (
+                      selectedTeam.roster.slice(0, 5).map((p: any, idx: number) => (
+                        <div key={p.id} onClick={() => setSelectedPlayer(p)} className="bg-zinc-950 p-2 rounded-lg border border-zinc-900 flex justify-between items-center cursor-pointer hover:border-sky-500 transition">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-black ${idx === 0 ? 'bg-red-500 text-white' : idx === 1 ? 'bg-orange-500 text-white' : idx === 2 ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}>{idx + 1}</span>
+                            {p.avatar_url && <img src={p.avatar_url} alt={p.ign} className="w-5 h-5 object-cover rounded bg-zinc-950" />}
+                            <span className="text-white font-bold text-[11px]">{p.ign}</span>
+                            <span className="text-[8px] text-sky-400 bg-zinc-900 px-1 py-0.5 rounded">{p.role}</span>
+                          </div>
+                          <span className="text-[10px] font-black text-sky-400">{p.total_kills || 0} Kills</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-1">
+                  <p className="text-zinc-300 font-bold">รายชื่อผู้เล่นทั้งหมดในทีม ({selectedTeam.roster.length}):</p>
                   {isAdmin && selectedTeam.scrimHistory.length > 0 && selectedTeam.roster.length > 0 && (
                     <button 
                       onClick={() => {
@@ -1027,7 +1058,7 @@ export default function Home() {
                       }} 
                       className="bg-sky-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow"
                     >
-                      กรอกคะแนนผู้เล่นทั้งทีม (6 เกมรวด)
+                      กรอกคะแนนผู้เล่นทั้งทีม (6 เกม)
                     </button>
                   )}
                 </div>
@@ -1417,6 +1448,15 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {isAdmin && (
+              <button 
+                onClick={() => handleResetSinglePlayerScores(selectedPlayer.id, selectedPlayer.ign)} 
+                className="py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-xl font-bold w-full text-xs transition"
+              >
+                🔄 รีเซตสถิติผู้เล่นคนนี้
+              </button>
             )}
 
             <button onClick={() => setSelectedPlayer(null)} className="py-2 bg-zinc-800 text-white rounded font-bold w-full">ปิดหน้าต่าง</button>
