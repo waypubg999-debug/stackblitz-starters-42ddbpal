@@ -6,6 +6,7 @@ import * as htmlToImage from 'html-to-image';
 export default function Home() {
   const [teamSearchQuery, setTeamSearchQuery] = useState<string>('');
   const [teams, setTeams] = useState<any[]>([]);
+  const [roadmaps, setRoadmaps] = useState<any[]>([]);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [passInput, setPassInput] = useState('');
@@ -37,16 +38,22 @@ export default function Home() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [playerGameStats, setPlayerGameStats] = useState<{ [playerId: string]: { kills: number | ''; assists: number | ''; damage: number | '' } }>({});
 
+  const [newPhaseTitle, setNewPhaseTitle] = useState('Phase 1: Foundation');
+  const [newTaskName, setNewTaskName] = useState('');
+
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [showPromoModal, setShowPromoModal] = useState(false);
-  
   const [promoTeamTarget, setPromoTeamTarget] = useState<any | null>(null);
-  
   const [generatedPromoUrl, setGeneratedPromoUrl] = useState<string | null>(null);
   const [generatedSingleTeamUrl, setGeneratedSingleTeamUrl] = useState<string | null>(null);
 
+  // 🌟 State สำหรับรูปภาพ Roadmap ประจำทีม
+  const [roadmapTeamTarget, setRoadmapTeamTarget] = useState<any | null>(null);
+  const [generatedRoadmapImageUrl, setGeneratedRoadmapImageUrl] = useState<string | null>(null);
+
   const promoRef = useRef<HTMLDivElement>(null);
   const singleTeamPromoRef = useRef<HTMLDivElement>(null);
+  const roadmapPromoRef = useRef<HTMLDivElement>(null); // 🌟 Ref สำหรับตัวกล่องภาพ Roadmap
 
   useEffect(() => {
     fetchAllData();
@@ -58,11 +65,13 @@ export default function Home() {
       const { data: pData } = await supabase.from('players').select('*');
       const { data: sData } = await supabase.from('team_scores').select('*');
       const { data: psData } = await supabase.from('player_game_scores').select('*');
+      const { data: rmData } = await supabase.from('team_roadmaps').select('*');
 
       setTeams(tData || []);
       setPlayers(pData || []);
       setTeamScores(sData || []);
       setPlayerScores(psData || []);
+      setRoadmaps(rmData || []);
     } catch (err) {
       console.error(err);
     }
@@ -134,6 +143,97 @@ export default function Home() {
     
     await supabase.from('teams').delete().eq('id', teamId);
     if (selectedTeam?.id === teamId) setSelectedTeam(null);
+    fetchAllData();
+  }
+
+  async function handleAddRoadmapTask(teamId: string) {
+    if (!requireAdmin()) return;
+    if (!newTaskName.trim()) return alert('กรุณากรอกหัวข้องานฝึกซ้อม');
+
+    const { error } = await supabase.from('team_roadmaps').insert([{
+      team_id: teamId,
+      phase_title: newPhaseTitle,
+      task_name: newTaskName.trim(),
+      is_completed: false
+    }]);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+    setNewTaskName('');
+    fetchAllData();
+  }
+
+  async function handleLoadRoadmapTemplate(teamId: string) {
+    if (!requireAdmin()) return;
+    if (!confirm('ต้องการโหลดเทมเพลตฝึกซ้อมมาตรฐาน 4 เฟส ให้ทีมนี้ใช่หรือไม่?')) return;
+
+    const defaultTemplateTasks = [
+      { phase_title: 'Phase 1: Foundation', task_name: 'คุมรีคอยล์ M416 / Beryl ในสนามซ้อม' },
+      { phase_title: 'Phase 1: Foundation', task_name: 'ฝึกการพีกยิงและการสื่อสารพิกัด' },
+      { phase_title: 'Phase 1: Foundation', task_name: 'ระบบการลงฟาร์ม (Drop Spot) และรับรถ' },
+      { phase_title: 'Phase 2: Synergy & Rotations', task_name: 'การอ่านวงและการเลือกคอมפאوند (Compound)' },
+      { phase_title: 'Phase 2: Synergy & Rotations', task_name: 'การขับรถโยกย้ายและจอดบังกระสุน' },
+      { phase_title: 'Phase 2: Synergy & Rotations', task_name: 'การแบ่งสัดส่วนพื้นที่ยืนคุมไลน์ (Zone Division)' },
+      { phase_title: 'Phase 3: Scrims & Error Fixing', task_name: 'รีวิวเทปหลังซ้อม (Post-Match Review)' },
+      { phase_title: 'Phase 3: Scrims & Error Fixing', task_name: 'ซ้อมไฟท์ 4v4 และการชาร์จบ้าน' },
+      { phase_title: 'Phase 3: Scrims & Error Fixing', task_name: 'การแก้เกมเฉพาะหน้าในวงท้าย (Late Game)' },
+      { phase_title: 'Phase 4: Tournament Ready', task_name: 'ซ้อมแผนหลัก (Plan A) และแผนสำรอง' },
+      { phase_title: 'Phase 4: Tournament Ready', task_name: 'การรักษาความนิ่งภายใต้แรงกดดันสูง' },
+      { phase_title: 'Phase 4: Tournament Ready', task_name: 'จำลองบรรยากาศแข่งจริง (Mock Scrims)' }
+    ];
+
+    const recordsToInsert = defaultTemplateTasks.map(t => ({
+      team_id: teamId,
+      phase_title: t.phase_title,
+      task_name: t.task_name,
+      is_completed: false
+    }));
+
+    const { error } = await supabase.from('team_roadmaps').insert(recordsToInsert);
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+
+    alert('โหลดเทมเพลต Roadmap 4 เฟสสำเร็จ!');
+    fetchAllData();
+  }
+
+  async function handleDeleteAllRoadmapTasks(teamId: string) {
+    if (!requireAdmin()) return;
+    if (!confirm('⚠️ ต้องการลบหัวข้อ Roadmap ทั้งหมดของทีมนี้ใช่หรือไม่?')) return;
+
+    const { error } = await supabase.from('team_roadmaps').delete().eq('team_id', teamId);
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+
+    alert('ลบหัวข้อ Roadmap ทั้งหมดสำเร็จ!');
+    fetchAllData();
+  }
+
+  async function handleToggleRoadmapTask(taskId: string, currentStatus: boolean) {
+    if (!requireAdmin()) return;
+
+    const { error } = await supabase.from('team_roadmaps')
+      .update({ is_completed: !currentStatus })
+      .eq('id', taskId);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      return;
+    }
+    fetchAllData();
+  }
+
+  async function handleDeleteRoadmapTask(taskId: string) {
+    if (!requireAdmin()) return;
+    if (!confirm('ต้องการลบหัวข้อซ้อมนี้ใช่หรือไม่?')) return;
+
+    await supabase.from('team_roadmaps').delete().eq('id', taskId);
     fetchAllData();
   }
 
@@ -274,6 +374,9 @@ export default function Home() {
 
   const teamsWithDetails = teams.map(t => {
     const tScores = teamScores.filter(s => String(s.team_id) === String(t.id));
+    const tRoadmaps = roadmaps.filter(rm => String(rm.team_id) === String(t.id));
+    const completedTasks = tRoadmaps.filter(rm => rm.is_completed).length;
+    const roadmapProgress = tRoadmaps.length > 0 ? Math.round((completedTasks / tRoadmaps.length) * 100) : 0;
     
     const rolePriority: { [key: string]: number } = {
       'IGL': 1,
@@ -323,6 +426,8 @@ export default function Home() {
       scores: tScores,
       roster: displayPlayers,
       allRoster: allTeamPlayers,
+      roadmaps: tRoadmaps,
+      roadmapProgress,
       totalPts,
       totalKillPts,
       totalPlacePts,
@@ -339,7 +444,6 @@ export default function Home() {
   const rankedTeams = [...filteredTeams].sort((a, b) => b.totalPts - a.totalPts);
   const activeSelectedTeam = selectedTeam ? teamsWithDetails.find(t => String(t.id) === String(selectedTeam.id)) : null;
 
-  // 🌟 ตั้งค่า pixelRatio เป็น 4 เพื่อความคมชัดสูงสุดระดับ 4K ขยายใหญ่ได้สะใจ
   async function handleGeneratePromoImage() {
     if (!promoRef.current) return;
     try {
@@ -357,6 +461,17 @@ export default function Home() {
       setGeneratedSingleTeamUrl(dataUrl);
     } catch (err) {
       alert('ไม่สามารถสร้างรูปภาพทีมได้: ' + err);
+    }
+  }
+
+  // 🌟 ฟังก์ชันแปลง Training Roadmap เป็นรูปภาพ
+  async function handleGenerateRoadmapImage() {
+    if (!roadmapPromoRef.current) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(roadmapPromoRef.current, { cacheBust: true, quality: 1.0, pixelRatio: 4 });
+      setGeneratedRoadmapImageUrl(dataUrl);
+    } catch (err) {
+      alert('ไม่สามารถสร้างรูปภาพ Roadmap ได้: ' + err);
     }
   }
 
@@ -431,7 +546,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างสร้างรูปโปสเตอร์รวมทีม (แนวนอน 3 คอลัมน์ ขยายใหญ่คมชัด 4K) ================= */}
       {isAdmin && showPromoModal && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-4xl rounded-2xl p-4 space-y-4 shadow-2xl max-h-[95vh] flex flex-col">
@@ -462,7 +576,6 @@ export default function Home() {
                     <p className="text-xs text-zinc-400">Sponsor By CONYSWEET</p>
                   </div>
 
-                  {/* 🌟 จัดเรียงเป็นแนวนอน 3 คอลัมน์ */}
                   <div className="grid grid-cols-3 gap-4">
                     {teamsWithDetails
                       .sort((a, b) => b.totalPts - a.totalPts)
@@ -535,12 +648,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างสร้างรูปโปรโมท "แยกรายทีม" ================= */}
       {promoTeamTarget && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
-              <h3 className="font-bold text-sky-400 text-sm">🖼️️ รูปโปรโมททีม: [{promoTeamTarget.tag}] {promoTeamTarget.name}</h3>
+              <h3 className="font-bold text-sky-400 text-sm">🖼 รูปโปรโมททีม: [{promoTeamTarget.tag}] {promoTeamTarget.name}</h3>
               <button onClick={() => { setPromoTeamTarget(null); setGeneratedSingleTeamUrl(null); }} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
@@ -637,6 +749,116 @@ export default function Home() {
         </div>
       )}
 
+      {/* 🌟 Modal สำหรับแสดงและดาวน์โหลดรูป Roadmap ประจำทีม */}
+      {roadmapTeamTarget && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
+          <div className="bg-zinc-900 border border-emerald-500/50 w-full max-w-lg rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-2 shrink-0">
+              <h3 className="font-bold text-emerald-400 text-sm">🗺️ รูป Roadmap ทีม: [{roadmapTeamTarget.tag}] {roadmapTeamTarget.name}</h3>
+              <button onClick={() => { setRoadmapTeamTarget(null); setGeneratedRoadmapImageUrl(null); }} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 pr-1 flex-1">
+              {generatedRoadmapImageUrl ? (
+                <div className="space-y-2 text-center">
+                  <p className="text-[10px] text-emerald-400 font-bold">✨ สร้างรูป Roadmap สำเร็จ! คลิกที่รูปเพื่อขยายดูภาพขนาดเต็ม</p>
+                  <img 
+                    src={generatedRoadmapImageUrl} 
+                    alt="Roadmap Promo" 
+                    onClick={() => setPreviewImage({ url: generatedRoadmapImageUrl, title: `Roadmap ทีม ${roadmapTeamTarget.name} (ขนาดเต็ม)` })}
+                    className="w-full rounded-xl border border-emerald-500/50 cursor-pointer shadow-2xl hover:opacity-95 transition"
+                  />
+                </div>
+              ) : (
+                <div 
+                  ref={roadmapPromoRef} 
+                  className="bg-zinc-950 p-5 rounded-2xl border-2 border-emerald-500/40 space-y-4 shadow-2xl text-white relative overflow-hidden"
+                >
+                  {roadmapTeamTarget.logo_url && (
+                    <div 
+                      className="absolute inset-0 bg-no-repeat bg-center bg-cover opacity-20 pointer-events-none filter blur-[4px] scale-125" 
+                      style={{ backgroundImage: `url(${roadmapTeamTarget.logo_url})` }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/85 to-black/95 pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center gap-4 border-b border-zinc-800 pb-3">
+                    {roadmapTeamTarget.logo_url ? (
+                      <img src={roadmapTeamTarget.logo_url} alt="" className="w-14 h-14 object-contain rounded-2xl bg-zinc-900/90 p-2 border border-zinc-700 shadow-xl" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">ไม่มีโลโก้</div>
+                    )}
+                    <div className="flex-1">
+                      <span className="text-[10px] font-black bg-emerald-500/30 text-emerald-300 px-2.5 py-0.5 rounded border border-emerald-500/50 inline-block mb-1">[{roadmapTeamTarget.tag}]</span>
+                      <h2 className="text-base font-black text-white">{roadmapTeamTarget.name}</h2>
+                      <p className="text-[10px] text-zinc-300">ความคืบหน้าการฝึกซ้อม: <strong className="text-emerald-400">{roadmapTeamTarget.roadmapProgress}% สำเร็จ</strong></p>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 w-full bg-zinc-900 h-2.5 rounded-full overflow-hidden border border-zinc-800">
+                    <div className="bg-emerald-500 h-full" style={{ width: `${roadmapTeamTarget.roadmapProgress}%` }} />
+                  </div>
+
+                  <div className="relative z-10 space-y-3">
+                    <h4 className="text-[11px] font-bold text-sky-400">📋 Training Stages & Checklist:</h4>
+                    {roadmapTeamTarget.roadmaps.length === 0 ? (
+                      <p className="text-[10px] text-zinc-500 italic text-center py-4">ยังไม่มีหัวข้อฝึกซ้อมในโรดแมพของทีมนี้</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {roadmapTeamTarget.roadmaps.map((rm: any) => (
+                          <div key={rm.id} className="bg-black/85 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-[10px] shadow">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold ${rm.is_completed ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
+                                {rm.is_completed ? '✓' : '○'}
+                              </span>
+                              <div>
+                                <span className="text-[8px] text-sky-400 font-bold block">{rm.phase_title}</span>
+                                <span className={`font-bold ${rm.is_completed ? 'line-through text-zinc-500' : 'text-white'}`}>{rm.task_name}</span>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${rm.is_completed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}>
+                              {rm.is_completed ? 'ผ่านแล้ว' : 'กำลังฝึก'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-center pt-2 border-t border-zinc-900 text-[8px] text-zinc-400 relative z-10">
+                    iSOTOPE ESPORTS TRAINING ROADMAP | Sponsor By CONYSWEET
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 pt-2 border-t border-zinc-800 flex gap-2">
+              {!generatedRoadmapImageUrl ? (
+                <button 
+                  onClick={handleGenerateRoadmapImage}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  ⚙️ แปลง Roadmap เป็นรูปภาพ
+                </button>
+              ) : (
+                <button 
+                  onClick={() => downloadImage(generatedRoadmapImageUrl, `Roadmap_${roadmapTeamTarget?.tag || 'Team'}_${Date.now()}.png`)}
+                  className="flex-1 bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs transition cursor-pointer shadow-lg"
+                >
+                  📥 ดาวน์โหลดรูป Roadmap
+                </button>
+              )}
+              <button 
+                onClick={() => { setRoadmapTeamTarget(null); setGeneratedRoadmapImageUrl(null); }} 
+                className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2.5 rounded-xl font-bold transition cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="text-xs font-bold text-zinc-300">รายชื่อทีมทั้งหมด ({teams.length} ทีม)</h2>
@@ -723,7 +945,6 @@ export default function Home() {
         </div>
       </main>
 
-      {/* ================= MODAL: หน้าจัดการทีม ================= */}
       {activeSelectedTeam && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/40 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -740,19 +961,121 @@ export default function Home() {
               <button onClick={() => setSelectedTeam(null)} className="text-zinc-400 hover:text-white font-bold text-base cursor-pointer">✕</button>
             </div>
 
-            <button 
-              onClick={() => {
-                const target = activeSelectedTeam;
-                setSelectedTeam(null);
-                setGeneratedSingleTeamUrl(null);
-                setPromoTeamTarget(target);
-              }}
-              className="w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 py-2 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow"
-            >
-              🖼️ สร้างรูปโปรโมททีมนี้ (ดูภาพขนาดเต็ม)
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                onClick={() => {
+                  const target = activeSelectedTeam;
+                  setSelectedTeam(null);
+                  setGeneratedSingleTeamUrl(null);
+                  setPromoTeamTarget(target);
+                }}
+                className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 py-2 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow text-[10px]"
+              >
+                🖼️ รูปโปรไฟล์ทีม
+              </button>
 
-            {/* รายชื่อผู้เล่น */}
+              {/* 🌟 ปุ่มเปิดหน้าสร้างรูป Roadmap ทีม */}
+              <button 
+                onClick={() => {
+                  const target = activeSelectedTeam;
+                  setSelectedTeam(null);
+                  setGeneratedRoadmapImageUrl(null);
+                  setRoadmapTeamTarget(target);
+                }}
+                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 py-2 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow text-[10px]"
+              >
+                🗺️ รูป Training Roadmap
+              </button>
+            </div>
+
+            {/* Training Roadmap Section */}
+            <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="text-[11px] font-bold text-sky-400">🗺️ Training Roadmap & Stages</h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-emerald-400 font-bold">{activeSelectedTeam.roadmapProgress}%</span>
+                  {isAdmin && activeSelectedTeam.roadmaps.length > 0 && (
+                    <button 
+                      onClick={() => handleDeleteAllRoadmapTasks(activeSelectedTeam.id)}
+                      className="text-[9px] bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-bold transition cursor-pointer"
+                    >
+                      🗑️ ลบทั้งหมด
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
+                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${activeSelectedTeam.roadmapProgress}%` }} />
+              </div>
+
+              {isAdmin && activeSelectedTeam.roadmaps.length === 0 && (
+                <button 
+                  onClick={() => handleLoadRoadmapTemplate(activeSelectedTeam.id)}
+                  className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold py-2 rounded-xl text-[11px] transition cursor-pointer flex items-center justify-center gap-1.5 shadow"
+                >
+                  📥 โหลดเทมเพลตฝึกซ้อมมาตรฐาน 4 เฟส (อัตโนมัติ)
+                </button>
+              )}
+
+              {activeSelectedTeam.roadmaps.length === 0 ? (
+                <p className="text-[10px] text-zinc-500 italic text-center py-2">ยังไม่มีการตั้งค่าโรดแมพสำหรับทีมนี้ (กดปุ่มด้านบนเพื่อโหลดเทมเพลต)</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {activeSelectedTeam.roadmaps.map((rm: any) => (
+                    <div key={rm.id} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 flex justify-between items-center text-[10px]">
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          checked={rm.is_completed} 
+                          disabled={!isAdmin}
+                          onChange={() => handleToggleRoadmapTask(rm.id, rm.is_completed)}
+                          className="w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-[8px] text-sky-400 font-bold block">{rm.phase_title}</span>
+                          <span className={`font-bold ${rm.is_completed ? 'line-through text-zinc-500' : 'text-white'}`}>{rm.task_name}</span>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <button onClick={() => handleDeleteRoadmapTask(rm.id)} className="text-red-400 hover:text-red-300 text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 cursor-pointer">ลบ</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="space-y-2 pt-2 border-t border-zinc-900">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <select 
+                      value={newPhaseTitle} 
+                      onChange={e => setNewPhaseTitle(e.target.value)}
+                      className="bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]"
+                    >
+                      <option value="Phase 1: Foundation">Phase 1: Foundation (พื้นฐาน)</option>
+                      <option value="Phase 2: Synergy & Rotations">Phase 2: Rotations (การเดินโซน/รถ)</option>
+                      <option value="Phase 3: Scrims & Error Fixing">Phase 3: Scrims (แก้จุดบอดไฟท์)</option>
+                      <option value="Phase 4: Tournament Ready">Phase 4: Tournament (พร้อมแข่งจริง)</option>
+                    </select>
+                    <input 
+                      type="text" 
+                      placeholder="หัวข้องานซ้อมเพิ่ม..." 
+                      value={newTaskName} 
+                      onChange={e => setNewTaskName(e.target.value)}
+                      className="bg-zinc-900 p-1.5 rounded text-white border border-zinc-800 text-[10px]"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => handleAddRoadmapTask(activeSelectedTeam.id)}
+                    className="w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 font-bold py-1.5 rounded text-[10px] transition cursor-pointer"
+                  >
+                    + เพิ่มหัวข้อเฉพาะกิจ
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <h4 className="text-[11px] font-bold text-zinc-300">
                 รายชื่อผู้เล่นในทีม ({activeSelectedTeam.roster.length} คน{isAdmin ? ` / ทั้งหมด ${activeSelectedTeam.allRoster.length} คน` : ''}):
@@ -930,7 +1253,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างดูประวัติส่วนตัวของผู้เล่น ================= */}
       {selectedPlayerForHistory && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
@@ -1039,7 +1361,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= MODAL: หน้าต่างกรอกคะแนนผู้เล่นรายเกม ================= */}
       {isAdmin && showPlayerScoreModal && selectedRoomForScore && activeSelectedTeam && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 text-xs">
           <div className="bg-zinc-900 border border-sky-500/50 w-full max-w-md rounded-2xl p-4 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1160,7 +1481,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= POPUP ขยายภาพขนาดใหญ่สุดคมชัดแบบเต็มจอ ================= */}
       {previewImage && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="relative max-w-6xl w-full flex flex-col items-center space-y-3">
